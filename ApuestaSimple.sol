@@ -73,31 +73,35 @@ contract StandardToken is Token {
     mapping (address => mapping (address => uint256)) allowed;
 }
 
-contract HeadsOrTails is StandardToken {
+contract BetCoin is StandardToken {
 
     string public name;                   //fancy name: eg Simon Bucks
     uint8 public decimals;                //How many decimals to show. ie. There could 1000 base units with 3 decimals. Meaning 0.980 SBX = 980 base units. It's like comparing 1 wei to 1 ether.
     string public symbol;                 //An identifier: eg SBX
-    address codere;
+    string public version = 'H1';         //human 1 standard. Just an arbitrary versioning scheme.
 
-    function HeadsOrTails(
+    function BetCoin(
         uint256 _initialAmount,
         string _tokenName,
         uint8 _decimalUnits,
         string _tokenSymbol
         ) {
-        codere = msg.sender;
         balances[msg.sender] = _initialAmount;               // Give the creator all initial tokens
         totalSupply = _initialAmount;                        // Update total supply
         name = _tokenName;                                   // Set the name for display purposes
         decimals = _decimalUnits;                            // Amount of decimals for display purposes
         symbol = _tokenSymbol;                               // Set the symbol for display purposes
     }
+}
 
+contract HeadsOrTails {
     uint8 public constant Heads = 1;
     uint8 public constant Tails = 2;
 
+    address codere;
+    mapping (address => uint256[]) amount;
     mapping (address => uint8[]) option;
+    mapping (address => uint256) earnings;
 
     uint8[] public result;
     uint8[] public alreadyChosen;
@@ -105,13 +109,19 @@ contract HeadsOrTails is StandardToken {
     uint256 betID;
     bool[] claimed;
 
-    function bet(uint256 _amount, uint8 _option) {
+    function HeadsOrTails() {
+        codere = msg.sender;
+    }
+
+    function bet(uint256 _amount, uint8 _option, address _contract) {
         require (_option != alreadyChosen[betID]);
-        require (balanceOf(msg.sender) >= _amount);
-        balances[msg.sender] -= _amount;
-        total[betID] += _amount;
-        option[msg.sender][betID] = _option;
-        alreadyChosen[betID] = _option;
+        BetCoin f = BetCoin(_contract);
+        if (f.transfer(codere,_amount)) {
+            amount[msg.sender][betID] = _amount;
+            total[betID] += _amount;
+            option[msg.sender][betID] = _option;
+            alreadyChosen[betID] = _option;
+        }
     }
 
     function coin(uint8 _result) {
@@ -123,7 +133,13 @@ contract HeadsOrTails is StandardToken {
     function claimPrize(uint256 _betID) {
         require(option[msg.sender][_betID] == result[_betID]);
         require(claimed[_betID] == false);
-        balances[msg.sender] += total[betID];
+        earnings[msg.sender] += total[_betID];
         claimed[_betID] = true;
+    }
+
+    function issue(address _player, address _contract) {
+        require(msg.sender == codere);
+        BetCoin f = BetCoin(_contract);
+        f.transfer(_player, earnings[_player]);
     }
 }
