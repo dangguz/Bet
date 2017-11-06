@@ -75,6 +75,7 @@ contract StandardToken is Token {
 
 contract BetCoin is StandardToken {
 
+    address tokenCreator;
     string public name;                   //fancy name: eg Simon Bucks
     uint8 public decimals;                //How many decimals to show. ie. There could 1000 base units with 3 decimals. Meaning 0.980 SBX = 980 base units. It's like comparing 1 wei to 1 ether.
     string public symbol;                 //An identifier: eg SBX
@@ -86,60 +87,73 @@ contract BetCoin is StandardToken {
         uint8 _decimalUnits,
         string _tokenSymbol
         ) {
+        tokenCreator = msg.sender;
         balances[msg.sender] = _initialAmount;               // Give the creator all initial tokens
         totalSupply = _initialAmount;                        // Update total supply
         name = _tokenName;                                   // Set the name for display purposes
         decimals = _decimalUnits;                            // Amount of decimals for display purposes
         symbol = _tokenSymbol;                               // Set the symbol for display purposes
     }
+
+    function getTokenCreatorAddr() returns (address) {
+        return tokenCreator;
+    }
 }
 
 contract HeadsOrTails {
-    uint8 public constant Heads = 1;
-    uint8 public constant Tails = 2;
+
+    enum Options { Heads, Tails }
+
+    struct player {
+        uint256[100] amount;
+        Options[100] option;
+        uint256 earnings;
+    }
 
     address codere;
-    mapping (address => uint256[]) amount;
-    mapping (address => uint8[]) option;
-    mapping (address => uint256) earnings;
+    mapping (address => player) players;
 
-    uint8[] public result;
-    uint8[] public alreadyChosen;
-    uint256[] total;
+    Options[100] public result;
+    Options[100] public alreadyChosen;
+    uint256[100] public total;
     uint256 betID;
-    bool[] claimed;
+    uint256[100] public minimumBet;
+    uint8[100] numPlayers;
+    bool[100] claimed;
+    BetCoin f;
 
     function HeadsOrTails() {
         codere = msg.sender;
     }
 
-    function bet(uint256 _amount, uint8 _option, address _contract) {
+    function bet(uint256 _amount, Options _option, uint256 _betID) {
+        require (_amount >= minimumBet);
         require (_option != alreadyChosen[betID]);
-        BetCoin f = BetCoin(_contract);
+        require (numPlayers[_betID] < 2);
         if (f.transfer(codere,_amount)) {
-            amount[msg.sender][betID] = _amount;
             total[betID] += _amount;
-            option[msg.sender][betID] = _option;
+            players[msg.sender].option[betID] = _option;
+            minimumBet[betID] = _amount;
             alreadyChosen[betID] = _option;
+            numPlayers[_betID] ++;
         }
     }
 
-    function coin(uint8 _result) {
+    function coin(Options _result) {
         require(msg.sender == codere);
         result[betID] = _result;
         betID ++;
     }
 
     function claimPrize(uint256 _betID) {
-        require(option[msg.sender][_betID] == result[_betID]);
+        require(players[msg.sender].option[_betID] == result[_betID]);
         require(claimed[_betID] == false);
-        earnings[msg.sender] += total[_betID];
+        players[msg.sender].earnings += total[_betID];
         claimed[_betID] = true;
     }
 
-    function issue(address _player, address _contract) {
+    function issue(address _addr) {
         require(msg.sender == codere);
-        BetCoin f = BetCoin(_contract);
-        f.transfer(_player, earnings[_player]);
+        f.transfer(_addr, players[_addr].earnings);
     }
 }
