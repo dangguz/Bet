@@ -102,58 +102,55 @@ contract BetCoin is StandardToken {
 
 contract HeadsOrTails {
 
-    enum Options { Heads, Tails }
-
-    struct player {
-        uint256[100] amount;
-        Options[100] option;
-        uint256 earnings;
-    }
+    uint8 public constant Heads = 1;
+    uint8 public constant Tails = 2;
 
     address codere;
-    mapping (address => player) players;
+    mapping (address => uint8[100]) option;
+    mapping (address => uint256) earnings;
 
-    Options[100] public result;
-    Options[100] public alreadyChosen;
+    uint8[100] public result;
+    uint8[100] public alreadyChosen;
     uint256[100] public total;
     uint256 betID;
     uint256[100] public minimumBet;
     uint8[100] numPlayers;
     bool[100] claimed;
-    BetCoin f;
 
     function HeadsOrTails() {
         codere = msg.sender;
     }
 
-    function bet(uint256 _amount, Options _option, uint256 _betID) {
-        require (_amount >= minimumBet);
-        require (_option != alreadyChosen[betID]);
+    function bet(uint256 _amount, uint8 _option, uint256 _betID, address _addr) {
+        require (_amount >= minimumBet[_betID]);
+        require (_option != alreadyChosen[_betID]);
         require (numPlayers[_betID] < 2);
+        BetCoin f = BetCoin(_addr);
         if (f.transfer(codere,_amount)) {
-            total[betID] += _amount;
-            players[msg.sender].option[betID] = _option;
-            minimumBet[betID] = _amount;
-            alreadyChosen[betID] = _option;
+            total[_betID] += _amount;
+            option[msg.sender][betID] = _option;
+            minimumBet[_betID] = _amount;
+            alreadyChosen[_betID] = _option;
             numPlayers[_betID] ++;
         }
     }
 
-    function coin(Options _result) {
+    function coin(uint8 _result) {
         require(msg.sender == codere);
         result[betID] = _result;
         betID ++;
     }
 
     function claimPrize(uint256 _betID) {
-        require(players[msg.sender].option[_betID] == result[_betID]);
+        require(option[msg.sender][_betID] == result[_betID]);
         require(claimed[_betID] == false);
-        players[msg.sender].earnings += total[_betID];
+        earnings[msg.sender] += total[_betID];
         claimed[_betID] = true;
     }
 
     function issue(address _addr) {
         require(msg.sender == codere);
-        f.transfer(_addr, players[_addr].earnings);
+        f.transfer(_addr, earnings[_addr]);
+        earnings[_addr] = 0;
     }
 }
