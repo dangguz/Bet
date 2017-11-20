@@ -37,7 +37,7 @@ contract Token {
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 }
 
-// Implements ERC 20 Token standard: https://github.com/ethereum/EIPs/issues/20
+// Implements ERC 20 Token standard
 contract StandardToken is Token {
 
     function transfer(address _to, uint256 _value) returns (bool success) {
@@ -75,57 +75,14 @@ contract StandardToken is Token {
     mapping (address => mapping (address => uint256)) allowed;
 }
 
-contract Coin is StandardToken {
+contract HumanStandardToken is StandardToken {
 
     address tokenCreator;
     string public name;                   // Fancy name
     uint8 public decimals;                // How many decimals to show
     string public symbol;                 // An identifier
 
-    function Coin(
-        uint256 _initialAmount,
-        string _tokenName,
-        uint8 _decimalUnits,
-        string _tokenSymbol
-        ) {
-        tokenCreator = msg.sender;
-        balances[msg.sender] = _initialAmount;               // Give the creator all initial tokens
-        totalSupply = _initialAmount;                        // Update total supply
-        name = _tokenName;                                   // Set the name for display purposes
-        decimals = _decimalUnits;                            // Amount of decimals for display purposes
-        symbol = _tokenSymbol;                               // Set the symbol for display purposes
-    }
-
-    function increaseSupply(uint256 _amount) {
-        require (msg.sender == tokenCreator);                // Only the Token creator can increase the supply
-        balances[tokenCreator] += _amount;
-        totalSupply += _amount;
-    }
-
-    function distributeToken(uint256 _amount) {
-        require (msg.sender == tokenCreator);
-        require (_amount <= totalSupply);
-        balances[tokenCreator] -= _amount;
-        balances[0x21480D1Fede8fD075c05002382b8470061431F5e] += _amount/4;
-        balances[0x293FF8bb7D651399E46E8347C031E9A4A7748332] += _amount/4;
-        balances[0x0dd06b07E315234F953665518Ca1a78Ede4b0b04] += _amount/4;
-        balances[0xF4492A1c2d93b070bF96b8B762d610Eb95753E61] += _amount/4;
-    }
-
-    function getTokenCreatorAddr() returns (address tokenCreatorAddr) {
-        return tokenCreator;                                 // Getter function of Token creator address
-    }
-
-}
-
-contract EnergyToken is StandardToken {
-
-    address tokenCreator;
-    string public name;                   // Fancy name
-    uint8 public decimals;                // How many decimals to show
-    string public symbol;                 // An identifier
-
-    function EnergyToken(
+    function HumanStandardToken(
         uint256 _initialAmount,
         string _tokenName,
         uint8 _decimalUnits,
@@ -163,11 +120,12 @@ contract EnergyToken is StandardToken {
 
 contract ContinuousMarket {
 
-    Coin x;
-    EnergyToken y;
+    HumanStandardToken x;
+    HumanStandardToken y;
 
     uint ui_scale = 1;
-    uint ui_maxPrice = 10;
+    uint ui_maxPrice = 100;
+    uint ui_idOffer;
 
     struct Offer {
         uint ui_idPrice;
@@ -176,6 +134,7 @@ contract ContinuousMarket {
         uint ui_lowerLimit;
         uint ui_upperLimit;
         bool b_type;
+        bool b_cleared;
     }
 
     struct Price {
@@ -188,15 +147,12 @@ contract ContinuousMarket {
         uint ui_sellingReference;
     }
 
-    uint ui_idOffer;
-    uint ui_pricesDimension = ui_maxPrice / ui_scale + 1;
-
     Offer [] public offers;
     Price [101] public prices;
 
     function ContinuousMarket (address _firstAddr, address _secondAddr) {
-        x = Coin(_firstAddr);
-        y = EnergyToken(_secondAddr);
+        x = HumanStandardToken(_firstAddr);
+        y = HumanStandardToken(_secondAddr);
     }
 
     function launchPublicOffer (
@@ -211,7 +167,7 @@ contract ContinuousMarket {
         uint ui_upperLimit;
 
         if (_type) { ui_sell = 1; ui_buy = 0; }
-        require (ui_buy * _price * _quantity + ui_sell * _quantity >= ui_buy * x.balanceOf(msg.sender) + ui_sell * y.balanceOf(msg.sender));
+        require (ui_buy * _price * _quantity + ui_sell * _quantity <= ui_buy * x.balanceOf(msg.sender) + ui_sell * y.balanceOf(msg.sender));
         require (_price % ui_scale == 0 && _price <= ui_maxPrice);
 
         x.transferFrom(msg.sender, this, ui_buy * _price * _quantity);
@@ -220,16 +176,16 @@ contract ContinuousMarket {
         ui_idPrice = _price / ui_scale + 1;
         if (prices[ui_idPrice].ui_buyingTotal * ui_sell + prices[ui_idPrice].ui_sellingTotal * ui_buy > 0) {
             if (prices[ui_idPrice].ui_buyingTotal * ui_sell + prices[ui_idPrice].ui_sellingTotal * ui_buy >= _quantity) {
-                x.transferFrom(this, msg.sender, ui_sell * _price * _quantity);
-                y.transferFrom(this, msg.sender, ui_buy * _quantity);
+                x.transfer(msg.sender, ui_sell * _price * _quantity);
+                y.transfer(msg.sender, ui_buy * _quantity);
                 prices[ui_idPrice].ui_buyingMatchedLevel += ui_sell * _quantity;
                 prices[ui_idPrice].ui_sellingMatchedLevel += ui_buy * _quantity;
                 prices[ui_idPrice].ui_buyingTotal -= ui_sell * _quantity;
                 prices[ui_idPrice].ui_sellingTotal -= ui_buy * _quantity;
                 _quantity = 0;
             } else {
-                x.transferFrom(this, msg.sender, ui_sell * prices[ui_idPrice].ui_buyingTotal * _quantity);
-                y.transferFrom(this, msg.sender, ui_buy * prices[ui_idPrice].ui_sellingTotal);
+                x.transfer(msg.sender, ui_sell * prices[ui_idPrice].ui_buyingTotal * _quantity);
+                y.transfer(msg.sender, ui_buy * prices[ui_idPrice].ui_sellingTotal);
                 prices[ui_idPrice].ui_buyingMatchedLevel += ui_sell * prices[ui_idPrice].ui_buyingTotal;
                 prices[ui_idPrice].ui_sellingMatchedLevel += ui_buy * prices[ui_idPrice].ui_sellingTotal;
                 _quantity = ui_buy * (_quantity - prices[ui_idPrice].ui_sellingTotal) + ui_sell * (_quantity - prices[ui_idPrice].ui_buyingTotal);
@@ -245,31 +201,37 @@ contract ContinuousMarket {
         ui_upperLimit = ui_lowerLimit + _quantity;
         prices[ui_idPrice].ui_buyingReference += ui_buy * _quantity;
         prices[ui_idPrice].ui_sellingReference += ui_sell * _quantity;
-        offers.push(Offer(ui_idPrice, msg.sender, _quantity, ui_lowerLimit, ui_upperLimit, _type));
+        offers.push(Offer(ui_idPrice, msg.sender, _quantity, ui_lowerLimit, ui_upperLimit, _type, false));
+        PublicOffer(ui_idOffer, _price, _quantity, _type);
         ui_idOffer ++;
-
-        PublicOffer(_price, _quantity, _type);
     }
 
     function clearingOffer(uint _idOffer) {
         require(msg.sender == offers[_idOffer].a_sender);
+        require(!offers[_idOffer].b_cleared);
         if (offers[_idOffer].b_type) {
             if (offers[_idOffer].ui_upperLimit <= prices[offers[_idOffer].ui_idPrice].ui_sellingMatchedLevel) {
-                x.transferFrom(this, msg.sender, offers[_idOffer].ui_quantity * prices[offers[_idOffer].ui_idPrice].ui_price);
+                x.transfer(msg.sender, offers[_idOffer].ui_quantity * prices[offers[_idOffer].ui_idPrice].ui_price);
+                offers[_idOffer].b_cleared = true;
             } else if (offers[_idOffer].ui_lowerLimit >= prices[offers[_idOffer].ui_idPrice].ui_sellingMatchedLevel){
             } else {
-                x.transferFrom(this, msg.sender, (prices[offers[_idOffer].ui_idPrice].ui_sellingMatchedLevel - offers[_idOffer].ui_lowerLimit) * prices[offers[_idOffer].ui_idPrice].ui_price);
+                x.transfer(msg.sender, (prices[offers[_idOffer].ui_idPrice].ui_sellingMatchedLevel - offers[_idOffer].ui_lowerLimit) * prices[offers[_idOffer].ui_idPrice].ui_price);
+                offers[_idOffer].ui_quantity -= (prices[offers[_idOffer].ui_idPrice].ui_sellingMatchedLevel - offers[_idOffer].ui_lowerLimit);
+                offers[_idOffer].ui_lowerLimit = prices[offers[_idOffer].ui_idPrice].ui_sellingMatchedLevel;
             }
         } else {
             if (offers[_idOffer].ui_upperLimit <= prices[offers[_idOffer].ui_idPrice].ui_buyingMatchedLevel) {
-                y.transferFrom(this, msg.sender, offers[_idOffer].ui_quantity);
+                y.transfer(msg.sender, offers[_idOffer].ui_quantity);
+                offers[_idOffer].b_cleared = true;
             } else if (offers[_idOffer].ui_lowerLimit >= prices[offers[_idOffer].ui_idPrice].ui_buyingMatchedLevel){
             } else {
-                y.transferFrom(this, msg.sender, prices[offers[_idOffer].ui_idPrice].ui_buyingMatchedLevel - offers[_idOffer].ui_lowerLimit);
+                y.transfer(msg.sender, prices[offers[_idOffer].ui_idPrice].ui_buyingMatchedLevel - offers[_idOffer].ui_lowerLimit);
+                offers[_idOffer].ui_quantity -= (prices[offers[_idOffer].ui_idPrice].ui_buyingMatchedLevel - offers[_idOffer].ui_lowerLimit);
+                offers[_idOffer].ui_lowerLimit = prices[offers[_idOffer].ui_idPrice].ui_buyingMatchedLevel;
             }
         }
     }
 
-    event PublicOffer(uint _price, uint _quantity, bool _type);
+    event PublicOffer(uint _idOffer, uint _price, uint _quantity, bool _type);
 
 }
