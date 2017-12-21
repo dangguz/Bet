@@ -11,7 +11,7 @@ contract mercado {
 tickectlist = mapping(address => uint);
 
 //Events
-
+event newTicket (address ticketAddress, uint reference);
 //Constructor debe desplegar el token
 
 //Functions

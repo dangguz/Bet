@@ -1,6 +1,6 @@
-var apu = artifacts.require("./ApuestaSimple.sol");
-var bet = artifacts.require("./Bet1.sol");
-var mer = artifacts.require("./Mercado.sol");
+var apu = artifacts.require("../contracts/betToken.sol");
+var bet = artifacts.require("../contracts/mercado.sol");
+var mer = artifacts.require("../contracts/ticket.sol");
 //Arriba: meter los contratos que se importan
 //Abajo: deployer.deploy(instanciaContratoADesplegar)
 module.exports = function(deployer) {
