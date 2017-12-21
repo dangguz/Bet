@@ -12,7 +12,7 @@ tickectlist = mapping(address => uint);
 
 //Events
 
-//Constructor
+//Constructor debe desplegar el token
 
 //Functions
 function setTicket( /*params*/){
