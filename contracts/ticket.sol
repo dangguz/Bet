@@ -1,8 +1,10 @@
-pragma blabla
+pragma solidity ^0.4.8;
 
-import "./lib/owned.sol"; //cambiar por multiowne si necesario
+//import "./lib/owned.sol"; //cambiar por multiowne si necesario
 
-contract ticket is owned{
+import "./enerToken.sol";
+
+contract ticket {
   //Data struct
 
   //Variables
@@ -10,8 +12,9 @@ contract ticket is owned{
   //Events
 
   //Constructor
-  function ticket (address _token){
-    
+  function ticket (address _tokenAddress){
+    address token;
+    token = enerToken(_tokenAddress);
   }
   //Functions
 
