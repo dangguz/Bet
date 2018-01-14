@@ -60,7 +60,18 @@ contract market {
         require (_price % priceScale == 0 && _price <= maxPrice);
         require (token.allowance(msg.sender, this) >= _price);
 
+        uint i;
         uint price = _price / priceScale + 1;
+
+        // Correct the price
+        if ((_type && prices[price + 1].buyingAccrued > 0)||(!_type && prices[price - 1].sellingAccrued > 0)){
+            if (_type) {
+                for (; prices[price + 1].buyingAccrued > 0; price ++){}
+            } else {
+                for (; prices[price - 1].sellingAccrued > 0; price --){}
+            }
+        }
+
         var auxA = prices[price].buyingOffers;  // Assigns a pointer to the corresponding offers vector
         var auxB = prices[price].sellingOffers;
         if (_type) {
@@ -68,17 +79,33 @@ contract market {
             auxB = prices[price].buyingOffers;
         }
 
+        // Add a new offer
         auxA.push(msg.sender);
         if (auxA.length <= auxB.length) {
-            uint pos = auxA.length -1;
+            uint pos = auxA.length - 1;
             address counterpart = auxB[pos];
-            createTicket(msg.sender, _price, _type);
-            createTicket(counterpart, _price, !_type);
+            createTicket(msg.sender, price, _type);
+            createTicket(counterpart, price, !_type);
+            if (_type) {
+                for (i = 0; i <= price; i ++)
+                prices[i].buyingAccrued --;
+            } else {
+                for (i = price; i < 101; i ++)
+                prices[i].sellingAccrued --;
+            }
+        } else {
+            if (_type) {
+                for (i = price; i < 101; i ++)
+                prices[i].sellingAccrued ++;
+            } else {
+                for (i = 0; i <= price; i ++)
+                prices[i].buyingAccrued ++;
+            }
         }
     }
 
-    function createTicket (address _agent, uint _price, bool _type) {
-        require (msg.sender == address(this));
+    function createTicket (address _agent, uint _price, bool _type) internal {
+        //require (msg.sender == address(this));
         address newTicket;
         newTicket = new ticket(this, token, _agent, _price, _type);
         //tickectList[newTicket] = /*elquesliea*/;
