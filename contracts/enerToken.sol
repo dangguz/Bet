@@ -14,7 +14,7 @@ contract enerToken is StandardToken {
         string _tokenName,
         uint8 _decimalUnits,
         string _tokenSymbol
-        ) {
+        ) public {
 
         tokenCreator = msg.sender;
         balances[msg.sender] = _initialAmount;               // Give the creator all initial tokens
@@ -25,7 +25,7 @@ contract enerToken is StandardToken {
 
     }
 
-    function getTokenCreatorAddr() returns (address tokenCreatorAddr) {
+    function getTokenCreatorAddr() public returns (address tokenCreatorAddr) {
         return tokenCreator;                                 // Getter function of Token creator address
     }
 

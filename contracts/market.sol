@@ -16,6 +16,7 @@ contract market {
     }
 
     struct price {
+        uint value;
         address [] buyingOffers;
         address [] sellingOffers;
         uint buyingAccrued;       // Accumulated value of buying offers from the highest buying offer price
@@ -44,7 +45,7 @@ contract market {
         string _loadShape,
         string _contractMaturity,
         string _deliveryDate
-        ) {
+        ) public {
         marketOperator = msg.sender;
         token = enerToken(_tokenAddress);
         product.ID = _ID;
@@ -56,27 +57,27 @@ contract market {
     }
 
     // Functions
-    function launchOffer (uint _price, bool _type) {
+    function launchOffer (uint _price, bool _type) public {
         require (_price % priceScale == 0 && _price <= maxPrice);
         require (token.allowance(msg.sender, this) >= _price);
 
         uint i;
-        uint price = _price / priceScale + 1;
+        uint priceID = _price / priceScale;
 
         // Correct the price
-        if ((_type && prices[price + 1].buyingAccrued > 0)||(!_type && prices[price - 1].sellingAccrued > 0)){
+        if ((_type && prices[priceID + 1].buyingAccrued > 0)||(!_type && prices[priceID - 1].sellingAccrued > 0)){
             if (_type) {
-                for (; prices[price + 1].buyingAccrued > 0; price ++){}
+                for (; prices[priceID + 1].buyingAccrued > 0; priceID ++){}
             } else {
-                for (; prices[price - 1].sellingAccrued > 0; price --){}
+                for (; prices[priceID - 1].sellingAccrued > 0; priceID --){}
             }
         }
 
-        var auxA = prices[price].buyingOffers;  // Assigns a pointer to the corresponding offers vector
-        var auxB = prices[price].sellingOffers;
+        var auxA = prices[priceID].buyingOffers;  // Assigns a pointer to the corresponding offers vector
+        var auxB = prices[priceID].sellingOffers;
         if (_type) {
-            auxA = prices[price].sellingOffers;
-            auxB = prices[price].buyingOffers;
+            auxA = prices[priceID].sellingOffers;
+            auxB = prices[priceID].buyingOffers;
         }
 
         // Add a new offer
@@ -84,21 +85,22 @@ contract market {
         if (auxA.length <= auxB.length) {
             uint pos = auxA.length - 1;
             address counterpart = auxB[pos];
-            createTicket(msg.sender, price, _type);
-            createTicket(counterpart, price, !_type);
+            prices[priceID].value = priceID * priceScale;
+            createTicket(msg.sender, prices[priceID].value, _type);
+            createTicket(counterpart, prices[priceID].value, !_type);
             if (_type) {
-                for (i = 0; i <= price; i ++)
+                for (i = 0; i <= priceID; i ++)
                 prices[i].buyingAccrued --;
             } else {
-                for (i = price; i < 101; i ++)
+                for (i = priceID; i < 101; i ++)
                 prices[i].sellingAccrued --;
             }
         } else {
             if (_type) {
-                for (i = price; i < 101; i ++)
+                for (i = priceID; i < 101; i ++)
                 prices[i].sellingAccrued ++;
             } else {
-                for (i = 0; i <= price; i ++)
+                for (i = 0; i <= priceID; i ++)
                 prices[i].buyingAccrued ++;
             }
         }
@@ -108,6 +110,7 @@ contract market {
         //require (msg.sender == address(this));
         address newTicket;
         newTicket = new ticket(this, token, _agent, _price, _type);
+        token.transferFrom(_agent, newTicket, _price);
         //tickectList[newTicket] = /*elquesliea*/;
     }
 
