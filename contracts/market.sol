@@ -57,51 +57,54 @@ contract market {
     }
 
     // Functions
-    function launchOffer (uint _price, bool _type) public {
+    function launchOffer (uint _price, uint _quantity, bool _type) public {
         require (_price % priceScale == 0 && _price <= maxPrice);
         require (token.allowance(msg.sender, this) >= _price);
+        require (_quantity % product.tickVolume == 0);
 
-        uint i;
-        uint priceID = _price / priceScale;
+        for (uint j = product.tickVolume; j <= _quantity; j += product.tickVolume) {
+            uint i;
+            uint priceID = _price / priceScale;
 
-        // Correct the price
-        if ((_type && prices[priceID + 1].buyingAccrued > 0)||(!_type && prices[priceID - 1].sellingAccrued > 0)){
-            if (_type) {
-                for (; prices[priceID + 1].buyingAccrued > 0; priceID ++){}
-            } else {
-                for (; prices[priceID - 1].sellingAccrued > 0; priceID --){}
+            // Correct the price
+            if ((_type && prices[priceID + 1].buyingAccrued > 0)||(!_type && prices[priceID - 1].sellingAccrued > 0)){
+                if (_type) {
+                    for (; prices[priceID + 1].buyingAccrued > 0; priceID ++){}
+                } else {
+                    for (; prices[priceID - 1].sellingAccrued > 0; priceID --){}
+                }
             }
-        }
 
-        var auxA = prices[priceID].buyingOffers;  // Assigns a pointer to the corresponding offers vector
-        var auxB = prices[priceID].sellingOffers;
-        if (_type) {
-            auxA = prices[priceID].sellingOffers;
-            auxB = prices[priceID].buyingOffers;
-        }
-
-        // Add a new offer
-        auxA.push(msg.sender);
-        if (auxA.length <= auxB.length) {
-            uint pos = auxA.length - 1;
-            address counterpart = auxB[pos];
-            prices[priceID].value = priceID * priceScale;
-            createTicket(msg.sender, prices[priceID].value, _type);
-            createTicket(counterpart, prices[priceID].value, !_type);
+            var auxA = prices[priceID].buyingOffers;  // Assigns a pointer to the corresponding offers vector
+            var auxB = prices[priceID].sellingOffers;
             if (_type) {
-                for (i = 0; i <= priceID; i ++)
-                prices[i].buyingAccrued --;
-            } else {
-                for (i = priceID; i < 101; i ++)
-                prices[i].sellingAccrued --;
+                auxA = prices[priceID].sellingOffers;
+                auxB = prices[priceID].buyingOffers;
             }
-        } else {
-            if (_type) {
-                for (i = priceID; i < 101; i ++)
-                prices[i].sellingAccrued ++;
+
+            // Add a new offer
+            auxA.push(msg.sender);
+            if (auxA.length <= auxB.length) {
+                uint pos = auxA.length - 1;
+                address counterpart = auxB[pos];
+                prices[priceID].value = priceID * priceScale;
+                createTicket(msg.sender, prices[priceID].value, _type);
+                createTicket(counterpart, prices[priceID].value, !_type);
+                if (_type) {
+                    for (i = 0; i <= priceID; i ++)
+                    prices[i].buyingAccrued --;
+                } else {
+                    for (i = priceID; i < 101; i ++)
+                    prices[i].sellingAccrued --;
+                }
             } else {
-                for (i = 0; i <= priceID; i ++)
-                prices[i].buyingAccrued ++;
+                if (_type) {
+                    for (i = priceID; i < 101; i ++)
+                    prices[i].sellingAccrued ++;
+                } else {
+                    for (i = 0; i <= priceID; i ++)
+                    prices[i].buyingAccrued ++;
+                }
             }
         }
     }

@@ -38,7 +38,7 @@ contract ticket {
     }
 
     //Functions
-    function activateTicket () public{
+    function activateTicket () public {
         require(msg.sender == owner);           // The ticket can be only activated by its owner
         require(!active);                       // The ticket can be only activated once
         require(token.allowance(msg.sender, this) >= 10 * margin);
