@@ -2,14 +2,14 @@ pragma solidity ^0.4.8;
 
 import "./StandardToken.sol";
 
-contract enerToken is StandardToken {
+contract MyToken is StandardToken {
 
     address tokenCreator;
     string public name;                   // Fancy name
     uint8 public decimals;                // How many decimals to show
     string public symbol;                 // An identifier
 
-    function enerToken(
+    function MyToken(
         uint256 _initialAmount,
         string _tokenName,
         uint8 _decimalUnits,
@@ -25,8 +25,9 @@ contract enerToken is StandardToken {
 
     }
 
+    // Getter function of Token creator address
     function getTokenCreatorAddr() public returns (address tokenCreatorAddr) {
-        return tokenCreator;                                 // Getter function of Token creator address
+        return tokenCreator;
     }
 
 }

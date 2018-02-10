@@ -1,26 +1,32 @@
 pragma solidity ^0.4.8;
 
-//import "./lib/owned.sol"; //cambiar por multiowne si necesario
+import "./OneUserOneOwner.sol";
+import "./MyToken.sol";
+import "./Market.sol";
 
-import "./enerToken.sol";
-import "./market.sol";
+contract Ticket is OneUserOneOwner {
+    // Data struct
 
-contract ticket {
-    //Data struct
+    // Variables
+    MyToken token;
+    Market mkt;
+    uint ID;
+    uint public ticketPrice;
+    uint ticketBalance;             // Balance for updating profit and loss
+    uint priceReference;            // Reference to compare with when updating the balance
+    uint threshold;                 // Threshold between negotiation and delivery periods
+    uint finishDate;                // Last day of the delivery period
+    bool period;                    // Period: 0 = negotiation, 1 = delivery
+    bool ticketType;
+    uint buy = 1; uint sell = 0;    // Defaulting to buy
 
-    //Variables
-    enerToken token;
-    market mkt;
-    address owner;
-    uint margin;
-    uint price;
-    bool active;
-    bool buyOrSell;
+    // Events
 
-    //Events
+    // Modifiers
 
-    //Constructor
-    function ticket (
+    // Constructor
+    function Ticket (
+        uint _ticketID,
         address _marketAddress,     // Address of the market. Since there is one market for each product,
                                     // the address of the market contains the information of the product
         address _tokenAddress,      // Address of the Token we are trading with
@@ -28,40 +34,42 @@ contract ticket {
         uint _price,                // Trading price
         bool _type                  // Type of the ticket: 0 = buying; 1 = selling
         ) public {
-        require(msg.sender == _marketAddress);  // Only the associated market contract can print tickets
-        token = enerToken(_tokenAddress);
-        mkt = market(_marketAddress);
-        owner = _agentAddress;
-        price = _price;
-        margin = 20 * price / 100;
-        buyOrSell = _type;
+        require (msg.sender == _marketAddress);  // Only the associated market contract can print tickets
+        ID = _ticketID;
+        token = MyToken(_tokenAddress);
+        mkt = Market(_marketAddress);
+        user = _agentAddress;
+        //threshold = mkt.product().deliveryDate;
+        //finishDate = threshold + mkt.product.contractMaturity();
+        ticketPrice = _price;
+        priceReference = ticketPrice;
+        ticketBalance = token.balanceOf(this);  // Initialize the ticket balance
+        ticketType = _type;
     }
 
-    //Functions
-    function activateTicket () public {
-        require(msg.sender == owner);           // The ticket can be only activated by its owner
-        require(!active);                       // The ticket can be only activated once
-        require(token.allowance(msg.sender, this) >= 10 * margin);
-        active = true;
-        token.transfer(msg.sender, price - margin);
+    // Functions
+    function updateTicketBalance (uint _energyPrice) public {
+        //require (msg.sender == oracle)
+        if (ticketType) { buy = 0; sell = 1;}            // Correct the variables if selling ticket
+        if (now > threshold) { period = true; }
+        if (period) { priceReference = ticketPrice; }
+        if (priceReference != _energyPrice)
+        ticketBalance += sell * (priceReference - _energyPrice) + buy * (_energyPrice - priceReference);
+        if (!period) { priceReference = _energyPrice; }
+        if (now == finishDate) { closeTicket(); }
     }
 
-    function settle (uint priceReference) public {
-        //require(msg.sender == oraculo?)
-        require(active == true);
-        require(priceReference != price);
-        if (buyOrSell) {
-            if (priceReference > price) {
-                token.transferFrom(owner, this, priceReference - price);
-            } else {
-                token.transfer(owner, price - priceReference);
-            }
+    function closeTicket () internal {
+        token.transfer(mkt, token.balanceOf(this));
+        token.transferFrom(mkt, owner, ticketBalance);
+        selfdestruct(mkt);
+    }
+
+    function sellTicket () public onlyUser {
+        if (ticketType) {
+            mkt.launchOffer(mkt.maxPrice(), 1, !ticketType, ID);
         } else {
-            if (priceReference > price) {
-                token.transfer(owner, priceReference - price);
-            } else {
-                token.transferFrom(owner, this, price - priceReference);
-            }
+            mkt.launchOffer(0, 1, !ticketType, ID);
         }
     }
 
