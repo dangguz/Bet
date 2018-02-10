@@ -1,43 +1,42 @@
 pragma solidity ^0.4.8;
 
 import "./MyToken.sol";
-import "./Ticket.sol";
+import "./ticket.sol";
 
 contract Market {
 
     // Data struct
-    struct derivative {
-        uint ID;                  // Identificator of the product
-        uint tickVolume;          // Quantity traded per offer
-        string contractType;      // i.e. future, forward, option, or swap
-        string loadShape;         // i.e. base or peak
-        uint contractMaturity;    // i.e. D, WE, Wk, M, Q or Y; duration (days)
-        uint deliveryDate;        // First day of the delivery period
-    }
-
     struct price {
-        uint value;
+        uint value;                 // Tokens per MWh
         address [] buyingOffers;
         address [] sellingOffers;
         // Accrued values for correcting the price
-        uint buyingAccrued;       // Accumulated value of buying offers from the highest buying offer price
-        uint sellingAccrued;      // Accumulated value of selling offers from the lowest selling offer price
+        uint buyingAccrued;         // Accumulated value of buying offers from the highest buying offer price
+        uint sellingAccrued;        // Accumulated value of selling offers from the lowest selling offer price
     }
 
     // Variables
+    // Public variables (accessible from Ticket)
+    uint public productID;          // Identificator of the product
+    uint public tickVolume;         // Quantity (MWh) traded per offer
+    uint public contractMaturity;   // i.e. D, WE, Wk, M, Q or Y; duration (days)
+    uint public deliveryDate;       // First day of the delivery period
+    uint public maxPrice = 100;     // Maximum price available
+    string public contractType;     // i.e. future, forward, option, or swap
+    string public loadShape;        // i.e. base or peak
+    address public marketOperator;
+    price [101] public prices;
+    // External contracts
     MyToken token;
     Ticket t;
-    address public marketOperator;
-    derivative public product;
-    price [101] prices;
-    uint public maxPrice = 100;
+    // Mappings
+    mapping (uint => address) ticketList;
+    // Additional variables
     uint priceScale = maxPrice / (prices.length - 1);
     uint margin;
     uint ticketID;
 
-    mapping (uint => address) ticketList;
-
-    //Events
+    // Events
     event ticketCreation (address ticketAddress, uint ticketID);
 
     // Constructor
@@ -52,25 +51,27 @@ contract Market {
         ) public {
         marketOperator = msg.sender;
         token = MyToken(_tokenAddress);
-        product.ID = _ID;
-        product.tickVolume = _tickVolume;
-        product.contractType = _contractType;
-        product.loadShape = _loadShape;
-        product.contractMaturity = _contractMaturity;
-        product.deliveryDate = (now / 1 days) + _daysToDeliveryDate;
+        productID = _ID;
+        tickVolume = _tickVolume;
+        contractType = _contractType;
+        loadShape = _loadShape;
+        contractMaturity = _contractMaturity;
+        deliveryDate = (now / 1 days) + _daysToDeliveryDate;
     }
 
     // Functions
     function launchOffer (uint _price, uint _quantity, bool _type, uint _ID) public {
+        // Check quantity and price are valid
+        require (_quantity % tickVolume == 0);
         require (_price % priceScale == 0 && _price <= maxPrice);
-        require (token.allowance(msg.sender, this) >= _price);
-        require (_quantity % product.tickVolume == 0);
+        // Check the sender has allowed this contract to spend its funds, unless the sender is a ticket
+        require (token.allowance(msg.sender, this) >= (_price * _quantity) || msg.sender == ticketList[_ID]);
 
-        for (uint j = product.tickVolume; j <= _quantity; j += product.tickVolume) {
+        for (uint j = tickVolume; j <= _quantity; j += tickVolume) {
             uint i;
             uint priceID = _price / priceScale;
 
-            // Correct the price
+            // Correct the price if necessary
             if ((_type && prices[priceID + 1].buyingAccrued > 0) || (!_type && prices[priceID - 1].sellingAccrued > 0)){
                 if (_type) {
                     for (; prices[priceID + 1].buyingAccrued > 0; priceID ++){}
@@ -88,16 +89,19 @@ contract Market {
 
             // Add a new offer
             auxA.push(msg.sender);
-            if (auxA.length <= auxB.length) {
+            if (auxA.length <= auxB.length) {         // Two offers have matched
                 uint pos = auxA.length - 1;
                 address counterpart = auxB[pos];
                 prices[priceID].value = priceID * priceScale;
                 if (msg.sender == ticketList[_ID]) {
+                    // If the sender is a ticket, no new ticket has to be created; the ticket user is updated instead
+                    // New user must pay the difference between the current trading price and the price registered in the ticket
                     t = Ticket(msg.sender);
                     uint priceDiff = prices[priceID].value - t.ticketPrice();
-                    token.transferFrom(counterpart, t.getUser(), token.balanceOf(t) + priceDiff);
+                    token.transferFrom(counterpart, t.getUser(), token.balanceOf(t) + tickVolume * priceDiff);
                     t.transferUser(counterpart);
                   } else {
+                    // Create two tickets, one for each offer
                     createTicket(msg.sender, prices[priceID].value, _type);
                     createTicket(counterpart, prices[priceID].value, !_type);
                 }
@@ -122,11 +126,11 @@ contract Market {
     }
 
     function createTicket (address _agent, uint _price, bool _type) internal {
-        address newTicket = ticketList[ticketID];
-        newTicket = new Ticket(ticketID, this, token, _agent, _price, _type);
-        ticketCreation(newTicket, ticketID);
+        address newTicket = new Ticket(ticketID, this, token, _agent, _price, _type); // Deploy the contract
+        ticketList[ticketID] = newTicket;     // Update the list
+        ticketCreation(newTicket, ticketID);  // Launch the event
         margin = _price / 5;
-        token.transferFrom(_agent, newTicket, margin);
+        token.transferFrom(_agent, newTicket, margin * tickVolume);
         ticketID ++;
     }
 

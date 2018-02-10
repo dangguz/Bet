@@ -2,7 +2,7 @@ pragma solidity ^0.4.8;
 
 import "./OneUserOneOwner.sol";
 import "./MyToken.sol";
-import "./Market.sol";
+import "./market.sol";
 
 contract Ticket is OneUserOneOwner {
     // Data struct
@@ -31,7 +31,7 @@ contract Ticket is OneUserOneOwner {
                                     // the address of the market contains the information of the product
         address _tokenAddress,      // Address of the Token we are trading with
         address _agentAddress,      // Address of the owner of the ticket
-        uint _price,                // Trading price
+        uint _price,                // Trading price (tokens per MWh)
         bool _type                  // Type of the ticket: 0 = buying; 1 = selling
         ) public {
         require (msg.sender == _marketAddress);  // Only the associated market contract can print tickets
@@ -39,37 +39,41 @@ contract Ticket is OneUserOneOwner {
         token = MyToken(_tokenAddress);
         mkt = Market(_marketAddress);
         user = _agentAddress;
-        //threshold = mkt.product().deliveryDate;
-        //finishDate = threshold + mkt.product.contractMaturity();
+        threshold = mkt.deliveryDate();
+        finishDate = threshold + mkt.contractMaturity();
         ticketPrice = _price;
         priceReference = ticketPrice;
         ticketBalance = token.balanceOf(this);  // Initialize the ticket balance
+        ticketBalance /= mkt.tickVolume();      // Correct the balance if tick volume is greater than 1
         ticketType = _type;
     }
 
     // Functions
     function updateTicketBalance (uint _energyPrice) public {
-        //require (msg.sender == oracle)
-        if (ticketType) { buy = 0; sell = 1;}            // Correct the variables if selling ticket
-        if (now > threshold) { period = true; }
+        //require (msg.sender == oracle)                    // Oracle must send the price signal
+        if (ticketType) { buy = 0; sell = 1;}               // Correct the variables if selling ticket
+        if ((now / 1 days) > threshold) { period = true; }  // Update the period when now (days) reaches the threshold
         if (period) { priceReference = ticketPrice; }
+        // Update the ticket balance if necessary
         if (priceReference != _energyPrice)
         ticketBalance += sell * (priceReference - _energyPrice) + buy * (_energyPrice - priceReference);
         if (!period) { priceReference = _energyPrice; }
-        if (now == finishDate) { closeTicket(); }
+        if ((now / 1 days) == finishDate) { closeTicket(); }
     }
 
     function closeTicket () internal {
         token.transfer(mkt, token.balanceOf(this));
-        token.transferFrom(mkt, owner, ticketBalance);
-        selfdestruct(mkt);
+        token.transferFrom(mkt, owner, ticketBalance * mkt.tickVolume());
+        selfdestruct(mkt);    // Destroy this contract
     }
 
     function sellTicket () public onlyUser {
+        require (!period);    // Ticket can only be sold in the negotiation period
+        // Place an offer with type = !ticketType
         if (ticketType) {
-            mkt.launchOffer(mkt.maxPrice(), 1, !ticketType, ID);
+            mkt.launchOffer(mkt.maxPrice(), mkt.tickVolume(), !ticketType, ID);
         } else {
-            mkt.launchOffer(0, 1, !ticketType, ID);
+            mkt.launchOffer(0, mkt.tickVolume(), !ticketType, ID);
         }
     }
 
