@@ -4,7 +4,7 @@ import "./StandardToken.sol";
 
 contract MyToken is StandardToken {
 
-    address tokenCreator;
+    address public tokenCreator;
     string public name;                   // Fancy name
     uint8 public decimals;                // How many decimals to show
     string public symbol;                 // An identifier
@@ -22,12 +22,6 @@ contract MyToken is StandardToken {
         name = _tokenName;                                   // Set the name for display purposes
         decimals = _decimalUnits;                            // Amount of decimals for display purposes
         symbol = _tokenSymbol;                               // Set the symbol for display purposes
-
-    }
-
-    // Getter function of Token creator address
-    function getTokenCreatorAddr() public returns (address tokenCreatorAddr) {
-        return tokenCreator;
     }
 
 }
