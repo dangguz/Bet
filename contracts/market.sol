@@ -38,6 +38,7 @@ contract Market {
 
     // Events
     event ticketCreation (address ticketAddress, uint ticketID);
+    event newOffer (uint _price, bool _type);
 
     // Constructor
     function Market (
@@ -89,6 +90,7 @@ contract Market {
 
             // Add a new offer
             auxA.push(msg.sender);
+            newOffer(priceID * priceScale, _type);
             if (auxA.length <= auxB.length) {         // Two offers have matched
                 uint pos = auxA.length - 1;
                 address counterpart = auxB[pos];
