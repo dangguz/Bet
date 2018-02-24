@@ -102,7 +102,10 @@ contract Market {
                     uint priceDiff = prices[priceID].value - t.ticketPrice();
                     token.transferFrom(counterpart, t.getUser(), token.balanceOf(t) + tickVolume * priceDiff);
                     t.transferUser(counterpart);
-                  } else {
+                } else if (msg.sender == counterpart) {
+                    // If the address of the sender is the same as the address of the counterpart, then the offer is cancelled
+                    // Nothing has to be done in this case
+                } else {
                     // Create two tickets, one for each offer
                     createTicket(msg.sender, prices[priceID].value, _type);
                     createTicket(counterpart, prices[priceID].value, !_type);
