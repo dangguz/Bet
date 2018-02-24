@@ -50,7 +50,7 @@ contract Ticket is OneUserOneOwner {
 
     // Functions
     function updateTicketBalance (uint _energyPrice) public {
-        //require (msg.sender == oracle)                    // Oracle must send the price signal
+        //require (msg.sender == oracle);                   // Oracle must send the price signal
         if (ticketType) { buy = 0; sell = 1;}               // Correct the variables if selling ticket
         if ((now / 1 days) > threshold) { period = true; }  // Update the period when now (days) reaches the threshold
         if (period) { priceReference = ticketPrice; }
@@ -63,7 +63,7 @@ contract Ticket is OneUserOneOwner {
 
     function closeTicket () internal {
         token.transfer(mkt, token.balanceOf(this));
-        token.transferFrom(mkt, owner, ticketBalance * mkt.tickVolume());
+        token.transferFrom(mkt, user, ticketBalance * mkt.tickVolume());
         selfdestruct(mkt);    // Destroy this contract
     }
 
