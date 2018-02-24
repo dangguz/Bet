@@ -3,7 +3,7 @@ pragma solidity ^0.4.8;
 import "./lib/Owned.sol";
 
 contract OneUserOneOwner is Owned {
-    address user;
+    address public user;
 
     modifier onlyUser() {
         require (msg.sender == user);

@@ -32,12 +32,12 @@ contract Market {
     // Mappings
     mapping (uint => address) ticketList;
     // Additional variables
-    uint priceScale = maxPrice / (prices.length - 1);
+    uint public priceScale = maxPrice / (prices.length - 1);
     uint margin;
     uint ticketID;
 
     // Events
-    event ticketCreation (address ticketAddress, uint ticketID);
+    event ticketCreation (address _ticketAddress, uint _ticketID);
     event newOffer (uint _price, bool _type);
 
     // Constructor
@@ -140,6 +140,20 @@ contract Market {
         require (msg.sender == marketOperator);
         ticketAddress = ticketList[_ticketID];
         return ticketAddress;
+    }
+
+    function getAccrued (uint _priceID, bool _type) public constant returns (uint accrued) {
+        accrued = prices[_priceID].buyingAccrued;
+        if (_type)
+        accrued = prices[_priceID].sellingAccrued;
+        return accrued;
+    }
+
+    function getNumOffers (uint _priceID, bool _type) public constant returns (uint num) {
+       num = prices[_priceID].buyingOffers.length;
+       if (_type)
+       num = prices[_priceID].sellingOffers.length;
+       return num;
     }
 
 }

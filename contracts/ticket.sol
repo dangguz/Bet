@@ -17,7 +17,7 @@ contract Ticket is OneUserOneOwner {
     uint threshold;                 // Threshold between negotiation and delivery periods
     uint finishDate;                // Last day of the delivery period
     bool period;                    // Period: 0 = negotiation, 1 = delivery
-    bool ticketType;
+    bool public ticketType;
     uint buy = 1; uint sell = 0;    // Defaulting to buy
 
     // Events
