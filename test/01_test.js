@@ -27,7 +27,7 @@ contract("MyToken", function(accounts){
     return MyToken.new(1000,"RandomToken",0,"RT", {"from": accounts[5]}).then(function(instance){
       c_Token = instance;
       e_Transfer = c_Token.Transfer({fromBlock: "0", toBlock: "latest"});
-      e_Approval = c_Token.Approval({fromBlock: 0, toBlock: "latest"});
+      e_Approval = c_Token.Approval({fromBlock: "0", toBlock: "latest"});
     });
   });
 
@@ -106,6 +106,7 @@ contract("MyToken", function(accounts){
     });
   });
 
+  // Transfer from function
   it("Account 4 sends 150 from creator account to account 1", function(){
     var data_1;
     var data_2;
