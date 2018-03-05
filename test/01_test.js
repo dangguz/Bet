@@ -1,4 +1,4 @@
-var MyToken = artifacts.require("./MyToken.sol");
+var MyToken = artifacts.require("../contracts/MyToken.sol");
 expect = require("chai").expect;
 
 // Tests can be nested into three levels: contract, describe, it
