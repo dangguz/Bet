@@ -10,9 +10,9 @@ contract Ticket is OneUserOneOwner {
     // Variables
     MyToken token;
     Market mkt;
-    uint ID;
+    uint public ID;
     uint public ticketPrice;
-    uint ticketBalance;             // Balance for updating profit and loss
+    uint ticketBalance;      // Balance for updating profit and loss
     uint priceReference;            // Reference to compare with when updating the balance
     uint threshold;                 // Threshold between negotiation and delivery periods
     uint finishDate;                // Last day of the delivery period
@@ -21,6 +21,7 @@ contract Ticket is OneUserOneOwner {
     uint buy = 1; uint sell = 0;    // Defaulting to buy
 
     // Events
+    event TicketDestruction (uint _ticketID);
 
     // Modifiers
 
@@ -43,8 +44,7 @@ contract Ticket is OneUserOneOwner {
         finishDate = threshold + mkt.contractMaturity();
         ticketPrice = _price;
         priceReference = ticketPrice;
-        ticketBalance = token.balanceOf(this);  // Initialize the ticket balance
-        ticketBalance /= mkt.tickVolume();      // Correct the balance if tick volume is greater than 1
+        ticketBalance = _price / 5;   // Initialize the ticket balance
         ticketType = _type;
     }
 
@@ -64,7 +64,8 @@ contract Ticket is OneUserOneOwner {
     function closeTicket () internal {
         token.transfer(mkt, token.balanceOf(this));
         token.transferFrom(mkt, user, ticketBalance * mkt.tickVolume());
-        selfdestruct(mkt);    // Destroy this contract
+        TicketDestruction(ID);
+        /* selfdestruct(mkt);    // Destroy this contract */
     }
 
     function sellTicket () public onlyUser {
@@ -75,6 +76,20 @@ contract Ticket is OneUserOneOwner {
         } else {
             mkt.launchOffer(0, mkt.tickVolume(), !ticketType, ID);
         }
+    }
+
+    function getBalance () public onlyUser constant returns (uint balance) {
+        balance = ticketBalance * mkt.tickVolume();
+        return balance;
+    }
+
+    // Additional functions for testing purposes
+    function changePeriod () public {
+        period = true;
+    }
+
+    function finish () public {
+        closeTicket();
     }
 
 }

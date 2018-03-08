@@ -39,6 +39,7 @@ contract Market {
     // Events
     event ticketCreation (address _ticketAddress, uint _ticketID);
     event newOffer (uint _price, bool _type);
+    event ticketUserChange (uint _ticketID);
 
     // Constructor
     function Market (
@@ -97,11 +98,18 @@ contract Market {
                 prices[priceID].value = priceID * priceScale;
                 if (msg.sender == ticketList[_ID]) {
                     // If the sender is a ticket, no new ticket has to be created; the ticket user is updated instead
-                    // New user must pay the difference between the current trading price and the price registered in the ticket
+                    // New user must pay the difference between the current trading price and the price registered in the ticket,
+                    // plus the initial margin calculated at original ticket price
                     t = Ticket(msg.sender);
-                    uint priceDiff = prices[priceID].value - t.ticketPrice();
-                    token.transferFrom(counterpart, t.getUser(), token.balanceOf(t) + tickVolume * priceDiff);
+                    uint transferValue = t.ticketPrice() / 5; // Initial margin
+                    transferValue += contractMaturity * (t.ticketPrice() - prices[priceID].value); // Include price difference
+                    if(_type) {
+                      transferValue += 2 * contractMaturity * (prices[priceID].value - t.ticketPrice()); // Correct if selling
+                    }
+                    transferValue *= tickVolume; // Increase proportionally to the tick volume
+                    token.transferFrom(counterpart, t.user(), transferValue);
                     t.transferUser(counterpart);
+                    ticketUserChange(t.ID());
                 } else if (msg.sender == counterpart) {
                     // If the address of the sender is the same as the address of the counterpart, then the offer is cancelled
                     // Nothing has to be done in this case
@@ -136,10 +144,11 @@ contract Market {
         ticketCreation(newTicket, ticketID);  // Launch the event
         margin = _price / 5;
         token.transferFrom(_agent, newTicket, margin * tickVolume);
+        token.approve(newTicket, 100);
         ticketID ++;
     }
 
-    function getTicketAddress (uint _ticketID) public returns (address ticketAddress) {
+    function getTicketAddress (uint _ticketID) public constant returns (address ticketAddress) {
         require (msg.sender == marketOperator);
         ticketAddress = ticketList[_ticketID];
         return ticketAddress;

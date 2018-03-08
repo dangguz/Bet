@@ -114,7 +114,7 @@ contract("MyToken", function(accounts){
     sender = m_creator;
     spender = accounts[4];
     receiver = accounts[1];
-    value = 150;
+    value = 250;
     // Get the initial balances of the selected accounts
     return c_Token.balanceOf(sender).then(function(res){
       balance_sender_before = res.toNumber();
