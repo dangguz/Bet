@@ -18,12 +18,17 @@ contract Ticket is OneUserOneOwner {
     uint finishDate;                // Last day of the delivery period
     bool period;                    // Period: 0 = negotiation, 1 = delivery
     bool public ticketType;
+    bool test = true;
     uint buy = 1; uint sell = 0;    // Defaulting to buy
 
     // Events
     event TicketDestruction (uint _ticketID);
 
     // Modifiers
+    modifier onlyTest() {
+        require(test);
+        _;
+    }
 
     // Constructor
     function Ticket (
@@ -84,11 +89,11 @@ contract Ticket is OneUserOneOwner {
     }
 
     // Additional functions for testing purposes
-    function changePeriod () public {
+    function changePeriod () public onlyTest {
         period = true;
     }
 
-    function finish () public {
+    function finish () public onlyTest {
         closeTicket();
     }
 
