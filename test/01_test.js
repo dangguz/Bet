@@ -122,7 +122,7 @@ contract("MyToken", function(accounts){
       return c_Token.balanceOf(receiver).then(function(res){
         balance_receiver_before = res.toNumber();
       }).then(function(){
-        return c_Token.approve(spender, value + 50, {"from": sender}).then(function(){
+        return c_Token.approve(spender, value - 50, {"from": sender}).then(function(){
           // Catch the event
           e_Approval.watch(function(err,eventResponse){
           data_2 = "\n    =>Event: Approval" +

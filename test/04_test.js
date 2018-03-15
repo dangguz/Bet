@@ -13,11 +13,11 @@ contract("Market", function(accounts){
   var m_tickVolume = 1;
   var m_priceScale = 1;
   // Define variables for this test
-  var negotiationPeriod = 4;
-  var deliveryPeriod = 2;
+  var negotiationPeriod = 3;
+  var deliveryPeriod = 3;
   var ticketPriceA = 50;
-  var sellActive = false;
-  var ticketPriceB = 52;
+  var sellActive = true;
+  var ticketPriceB = 51;
   var tsell = 2; // Must be lower than negotiationPeriod
   var seller = false;
 
@@ -31,7 +31,7 @@ contract("Market", function(accounts){
     accounts[9],
   );
   var seq_oracle = []
-  var seq_oracle_total = [50, 52, 51, 49, 53, 54, 52, 50, 50]
+  var seq_oracle_total = [50, 50, 55, 51, 51, 49, 50, 50, 50, 79]
   for(i = 0; i < negotiationPeriod + deliveryPeriod; i ++){
     seq_oracle.push(seq_oracle_total[i]);
   }
@@ -46,7 +46,7 @@ contract("Market", function(accounts){
 
   // Catch an instance of Market contract
   it("Catch an instance of the deployed contract (Market)", function(){
-    return Market.new(c_Token.address, 1, 1, "Future", "Base", 3, 10, {"from": m_marketCreator}).then(function(instance){
+    return Market.new(c_Token.address, 1, m_tickVolume, "Future", "Base", deliveryPeriod, 10, {"from": m_marketCreator}).then(function(instance){
       c_Market = instance;
       e_NewOffer = c_Market.newOffer({fromBlock: "0", toBlock: "latest"});
       e_TicketCreation = c_Market.ticketCreation({fromBlock: "0", toBlock: "latest"});
