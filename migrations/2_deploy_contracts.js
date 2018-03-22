@@ -1,5 +1,5 @@
-var MyToken = artifacts.require("../contracts/MyToken.sol");
-var market = artifacts.require("../contracts/market.sol");
+var MyToken = artifacts.require("./MyToken.sol");
+var market = artifacts.require("./market.sol");
 //var ticket = artifacts.require("./ticket.sol");
 
 module.exports = function(deployer) {

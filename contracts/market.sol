@@ -3,7 +3,7 @@ pragma solidity ^0.4.8;
 import "./MyToken.sol";
 import "./ticket.sol";
 
-contract market {
+contract Market {
 
     // Data struct
     struct price {
@@ -42,7 +42,7 @@ contract market {
     event ticketUserChange (uint _ticketID);
 
     // Constructor
-    function market (
+    function Market (
         address _tokenAddress,
         uint _ID,
         uint _tickVolume,
