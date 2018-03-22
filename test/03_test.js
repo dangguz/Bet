@@ -16,10 +16,12 @@ contract("Market", function(accounts){
   var m_priceScale;
   var m_maxPrice = 100;
   var m_pricesLength = 101;
-  // Define the sequence of offers to be sent in this test
-  var seq_type = new Array(1, 0, 1, 1, 0);
-  var seq_quantity = new Array(1, 1, 1, 1, 2);
-  var seq_price = new Array(55, 53, 50, 60, 30);
+
+  const testSize = 35;
+  var fs = require("fs");
+  var seq_type = [];
+  var seq_quantity = [];
+  var seq_price = [];
   var seq_agent = new Array(
     accounts[0],
     accounts[1],
@@ -30,7 +32,7 @@ contract("Market", function(accounts){
 
   // Catch an instance of Token contract
   it("Catch an instance of the deployed contract (Token)", function(){
-    return MyToken.new(10000,"RandomToken",0,"RT", {"from": accounts[5]}).then(function(instance){
+    return MyToken.new(100000,"RandomToken",0,"RT", {"from": accounts[5]}).then(function(instance){
       c_Token = instance;
     });
   });
@@ -42,12 +44,12 @@ contract("Market", function(accounts){
       e_TicketCreation = c_Market.ticketCreation({fromBlock: "0", toBlock: "latest"});
       e_NewOffer = c_Market.newOffer({fromBlock: "0", toBlock: "latest"});
     }).then(function(){
-      return c_Token.transfer(c_Market.address, 500, {"from": accounts[5]}).then(function(){
+      return c_Token.transfer(c_Market.address, 10000, {"from": accounts[5]}).then(function(){
       });
     });
   });
 
-  // (1) Verify public variables of Market contract
+  // Verify public variables of Market contract
   it("Check that values of public variables are correct", function(){
     var data;
     return c_Token.tokenCreator().then(function(res){
@@ -91,20 +93,40 @@ contract("Market", function(accounts){
     });
   });
 
-  // (2) Matching
-  for(var j = 0; j < seq_price.length; j ++){
-    sendOffer(seq_agent[j], seq_price[j], seq_quantity[j], seq_type[j]);
-  }
+  var i = 0;
+  do {
+    sendOffer(i);
+    i ++;
+  } while(i < testSize);
 
-  function sendOffer(_agent, _price, _quantity, _type){
+  var output = "OfferID,Price,Type,Quantity,PriceChange,TicketCreation,Gas\n";
+  function sendOffer(_index){
     it("Send a new offer", function(){
       var matching = false;
       // Define variables to use
-      var agent = _agent;
-      var price = _price;
-      var quantity = _quantity*m_tickVolume;
-      var type = _type;
+      var priceChange = false;
+      var gas;
+      var outputInfo;
+      var agent = seq_agent[_index];
+      var price;
+      var quantity;
+      var type;
       var typeString = "Buying";
+
+      // Read parameters of the offer
+      fs.readFile('./test/Data.json', 'utf8', function (err, data) {
+        if (err) throw err;
+        var obj = JSON.parse(data);
+        for (var i = 0; i < obj.length; i ++){
+          if(i == _index){
+            agent = accounts[obj[i].Agent];
+            price = obj[i].Price;
+            quantity = obj[i].Quantity*m_tickVolume;
+            type = obj[i].Type;
+          }
+        }
+      });
+
       // Check the initial state of the variables at the selected price
       return c_Market.getNumOffers(price/m_priceScale, 0).then(function(res){
         buyingOffers_num_before = res.toNumber();
@@ -117,7 +139,8 @@ contract("Market", function(accounts){
             // Agent must approve the contract to spend its funds
             return c_Token.approve(c_Market.address, price * quantity, {"from": agent}).then(function(){
               // Launch the offer
-              return c_Market.launchOffer(price, quantity, type, 0, {"from": agent}).then(function(){
+              return c_Market.launchOffer(price, quantity, type, 0, {"from": agent}).then(function(result){
+                gas = result.receipt.gasUsed;
                 // Catch the events
                 e_NewOffer.watch(function(err,eventResponse){
                   if(eventResponse.args._type){typeString = "Selling";}
@@ -125,7 +148,11 @@ contract("Market", function(accounts){
                               "\n             Price: " + eventResponse.args._price.toNumber() +
                               "\n             Type: " + typeString +
                               "\n             Quantity: " + quantity/m_tickVolume +
+                              "\n             Agent: " + agent +
+                              "\n             Gas: " + gas +
                               "\n";
+                  if (price != eventResponse.args._price.toNumber()){priceChange = true;}
+                  outputInfo = (_index+1) + "," + eventResponse.args._price.toNumber() + "," + typeString + "," + quantity/m_tickVolume + "," + priceChange;
                 });
                 // Tickets will not always be created
                 e_TicketCreation.watch(function(err,eventResponse){
@@ -161,6 +188,16 @@ contract("Market", function(accounts){
                                     "\n";
                         console.log(offerInfo);
                         console.log(priceInfo);
+                        // Add the output information
+                        output += outputInfo + "," + matching + "," + gas + "\n";
+                        // Write the output file when test is finished
+                        if (_index == testSize - 1){
+                          fs.writeFile("./test/output.csv", output, function (err) {
+                            if (err)
+                            return console.log(err);
+                            console.log("      Wrote test information in file output.csv, just check it");
+                          });
+                        }
                         // Print Tickets information if two offers have matched
                         if(matching){
                           c_Ticket = Ticket.at(ticketAddressA);
