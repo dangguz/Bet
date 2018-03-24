@@ -17,7 +17,7 @@ contract("Market", function(accounts){
   var m_maxPrice = 100;
   var m_pricesLength = 101;
 
-  const testSize = 35;
+  const testSize = 5;
   var fs = require("fs");
   var seq_type = [];
   var seq_quantity = [];

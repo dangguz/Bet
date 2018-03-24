@@ -7,7 +7,7 @@ contract Market {
 
     // Data struct
     struct price {
-        uint value;                 // Tokens per MWh
+        uint value;                 // Tokens per energy unit
         address [] buyingOffers;
         address [] sellingOffers;
         // Accrued values for correcting the price
@@ -26,19 +26,21 @@ contract Market {
     string public loadShape;        // i.e. base or peak
     address public marketOperator;
     price [101] public prices;
+    uint public priceScale = maxPrice / (prices.length - 1);
     // External contracts
     MyToken token;
     Ticket t;
     // Mappings
     mapping (uint => address) ticketList;
+    mapping (address => bool) public isTicket;
+    mapping (uint => mapping (uint => bool)) public cancelled;
     // Additional variables
-    uint public priceScale = maxPrice / (prices.length - 1);
     uint margin;
-    uint ticketID;
+    uint ticketID;                  // Identificator of the ticket
 
     // Events
     event ticketCreation (address _ticketAddress, uint _ticketID);
-    event newOffer (uint _price, bool _type);
+    event newOffer (uint _price, uint _priceID, bool _type, uint _offerID);
     event ticketUserChange (uint _ticketID);
 
     // Constructor
@@ -63,14 +65,13 @@ contract Market {
 
     // Functions
     function launchOffer (uint _price, uint _quantity, bool _type, uint _ID) public {
-        // Check quantity and price are valid
+        // Check offer parameters are valid
         require (_quantity % tickVolume == 0);
         require (_price % priceScale == 0 && _price <= maxPrice);
         // Check the sender has allowed this contract to spend its funds, unless the sender is a ticket
-        require (token.allowance(msg.sender, this) >= (_price * _quantity) || msg.sender == ticketList[_ID]);
+        require (token.allowance(msg.sender, this) >= (_price * _quantity) || isTicket[msg.sender]);
 
         for (uint j = tickVolume; j <= _quantity; j += tickVolume) {
-            uint i;
             uint priceID = _price / priceScale;
 
             // Correct the price if necessary
@@ -91,61 +92,90 @@ contract Market {
 
             // Add a new offer
             auxA.push(msg.sender);
-            newOffer(priceID * priceScale, _type);
+            newOffer(priceID * priceScale, priceID, _type, auxA.length);
             if (auxA.length <= auxB.length) {         // Two offers have matched
                 uint pos = auxA.length - 1;
                 address counterpart = auxB[pos];
                 prices[priceID].value = priceID * priceScale;
-                if (msg.sender == ticketList[_ID]) {
-                    // If the sender is a ticket, no new ticket has to be created; the ticket user is updated instead
-                    // New user must pay the difference between the current trading price and the price registered in the ticket,
-                    // plus the initial margin calculated at original ticket price
-                    t = Ticket(msg.sender);
-                    uint transferValue = t.ticketPrice() / 5; // Initial margin
-                    transferValue += contractMaturity * (t.ticketPrice() - prices[priceID].value); // Include price difference
-                    if(_type) {
-                      transferValue += 2 * contractMaturity * (prices[priceID].value - t.ticketPrice()); // Correct if selling
+                // Check if the offer have been cancelled
+                if (cancelled[priceID][pos]) {
+                  j -= tickVolume;
+                } else {
+                    // Check for strange cases
+                    if (msg.sender == counterpart || (isTicket[msg.sender] && isTicket[counterpart])) {
+                        revert();
+                    } else if (isTicket[msg.sender] || isTicket[counterpart]) {
+                        // If the sender/counterpart is a ticket, no new ticket has to be created; the ticket user is updated instead
+                        // New user must pay the difference between the current trading price and the price registered in the ticket,
+                        // plus the initial margin calculated at original ticket price
+                        // Default assumes counterpart as the ticket
+                        address existingTicket = counterpart;
+                        address newUser = msg.sender;
+                        // Correct variables if the ticket is the sender
+                        if (isTicket[msg.sender]) {
+                            existingTicket = msg.sender;
+                            newUser = counterpart;
+                        }
+                        t = Ticket(existingTicket); // Catch the contract
+                        uint transferValue = t.ticketPrice() / 5; // Initial margin
+                        transferValue += contractMaturity * (t.ticketPrice() - prices[priceID].value); // Include price difference
+                        // Correct transferValue if selling
+                        if(_type)
+                        transferValue += 2 * contractMaturity * (prices[priceID].value - t.ticketPrice());
+                        transferValue *= tickVolume; // Increase proportionally to the tick volume
+                        // Execute the transfer
+                        token.transferFrom(newUser, t.user(), transferValue);
+                        t.transferUser(newUser);
+                        ticketUserChange(t.ID());
+                    } else {
+                        // Create two tickets, one for each offer
+                        createTicket(msg.sender, prices[priceID].value, _type);
+                        createTicket(counterpart, prices[priceID].value, !_type);
                     }
-                    transferValue *= tickVolume; // Increase proportionally to the tick volume
-                    token.transferFrom(counterpart, t.user(), transferValue);
-                    t.transferUser(counterpart);
-                    ticketUserChange(t.ID());
-                } else if (msg.sender == counterpart) {
-                    // If the address of the sender is the same as the address of the counterpart, then the offer is cancelled
-                    // Nothing has to be done in this case
-                } else {
-                    // Create two tickets, one for each offer
-                    createTicket(msg.sender, prices[priceID].value, _type);
-                    createTicket(counterpart, prices[priceID].value, !_type);
-                }
-                // Update accrued curves
-                if (_type) {
-                    for (i = 0; i <= priceID; i ++)
-                    prices[i].buyingAccrued --;
-                } else {
-                    for (i = priceID; i < 101; i ++)
-                    prices[i].sellingAccrued --;
+                    // Update accrued curves
+                    updateAccruedCurves(!_type, false, priceID);
                 }
             } else {
-                if (_type) {
-                    for (i = priceID; i < 101; i ++)
-                    prices[i].sellingAccrued ++;
-                } else {
-                    for (i = 0; i <= priceID; i ++)
-                    prices[i].buyingAccrued ++;
-                }
+                // Update accrued curves
+                updateAccruedCurves(_type, true, priceID);
             }
+        }
+    }
+
+    function updateAccruedCurves (bool _type, bool _increase, uint _priceID) internal {
+        uint i;
+        if (_type && _increase) {
+            for (i = _priceID; i < prices.length; i ++)
+            prices[i].sellingAccrued ++;
+        } else if (_type && !_increase) {
+            for (i = _priceID; i < prices.length; i ++)
+            prices[i].sellingAccrued --;
+        } else if (!_type && !_increase) {
+            for (i = 0; i <= _priceID; i ++)
+            prices[i].buyingAccrued --;
+        } else {
+            for (i = 0; i <= _priceID; i ++)
+            prices[i].buyingAccrued ++;
         }
     }
 
     function createTicket (address _agent, uint _price, bool _type) internal {
         address newTicket = new Ticket(ticketID, this, token, _agent, _price, _type); // Deploy the contract
         ticketList[ticketID] = newTicket;     // Update the list
+        isTicket[newTicket] = true;           // Update ticket detector
         ticketCreation(newTicket, ticketID);  // Launch the event
         margin = _price / 5;
         token.transferFrom(_agent, newTicket, margin * tickVolume);
         token.approve(newTicket, 100);
         ticketID ++;
+    }
+
+    function cancellOffer (uint _priceID, uint _offerID, bool _type) public {
+        require ((msg.sender == prices[_priceID].buyingOffers[_offerID - 1] && !_type) || (msg.sender == prices[_priceID].sellingOffers[_offerID - 1] && _type));
+        // Cancell the offer
+        cancelled[_priceID][_offerID - 1] = true;
+        // Update accrued curves
+        updateAccruedCurves(_type, false, _priceID);
     }
 
     function getTicketAddress (uint _ticketID) public constant returns (address ticketAddress) {
