@@ -170,10 +170,14 @@ contract Market {
         ticketID ++;
     }
 
-    function cancellOffer (uint _priceID, uint _offerID, bool _type) public {
-        require ((msg.sender == prices[_priceID].buyingOffers[_offerID - 1] && !_type) || (msg.sender == prices[_priceID].sellingOffers[_offerID - 1] && _type));
+    function cancelOffer (uint _priceID, uint _offerID, bool _type) public {
+        uint pos = _offerID - 1;
+        var aux = prices[_priceID].buyingOffers;
+        if (_type)
+        aux = prices[_priceID].sellingOffers;
+        require (msg.sender == aux[pos]);
         // Cancell the offer
-        cancelled[_priceID][_offerID - 1] = true;
+        cancelled[_priceID][pos] = true;
         // Update accrued curves
         updateAccruedCurves(_type, false, _priceID);
     }
