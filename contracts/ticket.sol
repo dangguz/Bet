@@ -12,11 +12,11 @@ contract Ticket is OneUserOneOwner {
     Market mkt;
     uint public ID;
     uint public ticketPrice;
-    uint ticketBalance;      // Balance for updating profit and loss
+    uint ticketBalance;             // Balance for updating profit and loss
     uint priceReference;            // Reference to compare with when updating the balance
     uint threshold;                 // Threshold between negotiation and delivery periods
     uint finishDate;                // Last day of the delivery period
-    bool period;                    // Period: 0 = negotiation, 1 = delivery
+    bool public period;             // Period: 0 = negotiation, 1 = delivery
     bool public ticketType;
     bool test = true;
     uint buy = 1; uint sell = 0;    // Defaulting to buy
@@ -70,16 +70,16 @@ contract Ticket is OneUserOneOwner {
         token.transfer(mkt, token.balanceOf(this));
         token.transferFrom(mkt, user, ticketBalance * mkt.tickVolume());
         TicketDestruction(ID);
-        /* selfdestruct(mkt);    // Destroy this contract */
+        selfdestruct(mkt);    // Destroy this contract
     }
 
-    function sellTicket () public onlyUser {
-        require (!period);    // Ticket can only be sold in the negotiation period
-        // Place an offer with type = !ticketType
+    function sellTicket (uint _atThisPrice) public onlyUser {
+        require (!period); // Ticket can only be sold in the negotiation period
+        // Place an offer with type = !ticketType at the desire price
         if (ticketType) {
-            mkt.launchOffer(mkt.maxPrice(), mkt.tickVolume(), !ticketType, ID);
+            mkt.launchOffer(_atThisPrice, mkt.tickVolume(), !ticketType, ID);
         } else {
-            mkt.launchOffer(0, mkt.tickVolume(), !ticketType, ID);
+            mkt.launchOffer(_atThisPrice, mkt.tickVolume(), !ticketType, ID);
         }
     }
 
