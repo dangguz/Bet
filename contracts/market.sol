@@ -8,16 +8,16 @@ contract Market {
     // Data struct
     struct price {
         uint value;                 // Tokens per energy unit
-        address [] buyingOffers;
-        address [] sellingOffers;
+        address [] buyingOffers;    // Local buying offers vector (contains the buying offers inside this price)
+        address [] sellingOffers;   // Local selling offers vector (contains the selling offers inside this price)
         // Accrued values for correcting the price
         uint buyingAccrued;         // Accumulated value of buying offers from the highest buying offer price
         uint sellingAccrued;        // Accumulated value of selling offers from the lowest selling offer price
     }
     struct offer {
-        uint priceID;
-        uint level;
-        bool oType;
+        uint priceID;               // Linked price
+        uint level;                 // Position at the corresponding offers vector inside the related price structure
+        bool oType;                 // Type of the offer: 0 = buying; 1 = selling (for identifying the corresponding vector)
     }
 
     // Variables
@@ -29,9 +29,9 @@ contract Market {
     uint public maxPrice = 100;     // Maximum price available
     string public contractType;     // i.e. future, forward, option, or swap
     string public loadShape;        // i.e. base or peak
-    address public marketOperator;
-    price [101] public prices;
-    offer [] offers;
+    address public marketOperator;  // Sender of the Market contract
+    price [101] public prices;      // Prices vector
+    offer [] offers;                // Global offers vector (contains all Market offers)
     uint public priceScale = maxPrice / (prices.length - 1);
     // External contracts
     MyToken token;
@@ -41,7 +41,7 @@ contract Market {
     mapping (address => bool) public isTicket;
     mapping (uint => mapping (uint => bool)) public cancelled;
     // Additional variables
-    uint margin;
+    uint margin;                    // Margin initially deposited in the ticket contract
     uint ticketID;                  // Identificator of the ticket
 
     // Events
@@ -77,10 +77,12 @@ contract Market {
         // Check the sender has allowed this contract to spend its funds, unless the sender is a ticket
         require (token.allowance(msg.sender, this) >= (_price * _quantity) || isTicket[msg.sender]);
 
+        // All the offers are processed as unitary ones (quantity = tickVolume)
+        // It performs a loop which will send k unitary offers
         for (uint j = tickVolume; j <= _quantity; j += tickVolume) {
             uint priceID = _price / priceScale;
 
-            // Correct the price if necessary
+            // Correct the price if necessary using accrued curves
             if ((_type && prices[priceID + 1].buyingAccrued > 0) || (!_type && prices[priceID - 1].sellingAccrued > 0)){
                 if (_type) {
                     for (; prices[priceID + 1].buyingAccrued > 0; priceID ++){}
@@ -193,7 +195,7 @@ contract Market {
         var aux = prices[x].buyingOffers;
         if (offers[_offerID].oType)
         aux = prices[x].sellingOffers;
-        require (msg.sender == aux[y]);
+        require (msg.sender == aux[y]); // The offer can only be cancelled by its sender
         // Cancell the offer
         cancelled[x][y] = true;
         // Update accrued curves
