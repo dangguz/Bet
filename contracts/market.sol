@@ -14,6 +14,11 @@ contract Market {
         uint buyingAccrued;         // Accumulated value of buying offers from the highest buying offer price
         uint sellingAccrued;        // Accumulated value of selling offers from the lowest selling offer price
     }
+    struct offer {
+        uint priceID;
+        uint level;
+        bool oType;
+    }
 
     // Variables
     // Public variables (accessible from Ticket)
@@ -26,6 +31,7 @@ contract Market {
     string public loadShape;        // i.e. base or peak
     address public marketOperator;
     price [101] public prices;
+    offer [] offers;
     uint public priceScale = maxPrice / (prices.length - 1);
     // External contracts
     MyToken token;
@@ -92,17 +98,22 @@ contract Market {
 
             // Add a new offer
             auxA.push(msg.sender);
-            newOffer(priceID * priceScale, priceID, _type, auxA.length);
-            if (auxA.length <= auxB.length) {         // Two offers have matched
+            offers.push(offer(priceID, auxA.length - 1, _type));
+            newOffer(priceID * priceScale, priceID, _type, offers.length - 1);
+            if (auxA.length <= auxB.length) { // Two offers have matched
                 uint pos = auxA.length - 1;
                 address counterpart = auxB[pos];
                 prices[priceID].value = priceID * priceScale;
-                // Check if the offer have been cancelled
+                // Check if the counterpart offer have been cancelled
                 if (cancelled[priceID][pos]) {
                   j -= tickVolume;
                 } else {
                     // Check for strange cases
-                    if (msg.sender == counterpart || (isTicket[msg.sender] && isTicket[counterpart])) {
+                    if (msg.sender == counterpart) {
+                        // Nothing has to be done in this case
+                        // Performs manual cancellation of the offer
+                    } else if (isTicket[msg.sender] && isTicket[counterpart]) {
+                        // The case that both enter offer and counterpart were sent by a ticket is not contemplated
                         revert();
                     } else if (isTicket[msg.sender] || isTicket[counterpart]) {
                         // If the sender/counterpart is a ticket, no new ticket has to be created; the ticket user is updated instead
@@ -117,16 +128,22 @@ contract Market {
                             newUser = counterpart;
                         }
                         t = Ticket(existingTicket); // Catch the contract
-                        uint transferValue = t.ticketPrice() / 5; // Initial margin
-                        transferValue += contractMaturity * (t.ticketPrice() - prices[priceID].value); // Include price difference
-                        // Correct transferValue if selling
-                        if(_type)
-                        transferValue += 2 * contractMaturity * (prices[priceID].value - t.ticketPrice());
-                        transferValue *= tickVolume; // Increase proportionally to the tick volume
-                        // Execute the transfer
-                        token.transferFrom(newUser, t.user(), transferValue);
-                        t.transferUser(newUser);
-                        ticketUserChange(t.ID());
+                        if (t.period()) {
+                            // If the counterpart offer corresponds to a ticket which is already in delivery period, the offer cannot be processed
+                            // The situation is the same as if the counterpart offer would have been cancelled
+                            j -= tickVolume;
+                        } else {
+                            uint transferValue = t.ticketPrice() / 5; // Initial margin
+                            transferValue += contractMaturity * (t.ticketPrice() - prices[priceID].value); // Include price difference
+                            // Correct transferValue if selling
+                            if(_type)
+                            transferValue += 2 * contractMaturity * (prices[priceID].value - t.ticketPrice());
+                            transferValue *= tickVolume; // Increase proportionally to the tick volume
+                            // Execute the transfer
+                            token.transferFrom(newUser, t.user(), transferValue);
+                            t.transferUser(newUser);
+                            ticketUserChange(t.ID());
+                        }
                     } else {
                         // Create two tickets, one for each offer
                         createTicket(msg.sender, prices[priceID].value, _type);
@@ -170,16 +187,17 @@ contract Market {
         ticketID ++;
     }
 
-    function cancelOffer (uint _priceID, uint _offerID, bool _type) public {
-        uint pos = _offerID - 1;
-        var aux = prices[_priceID].buyingOffers;
-        if (_type)
-        aux = prices[_priceID].sellingOffers;
-        require (msg.sender == aux[pos]);
+    function cancelOffer (uint _offerID) public {
+        uint x = offers[_offerID].priceID;
+        uint y = offers[_offerID].level;
+        var aux = prices[x].buyingOffers;
+        if (offers[_offerID].oType)
+        aux = prices[x].sellingOffers;
+        require (msg.sender == aux[y]);
         // Cancell the offer
-        cancelled[_priceID][pos] = true;
+        cancelled[x][y] = true;
         // Update accrued curves
-        updateAccruedCurves(_type, false, _priceID);
+        updateAccruedCurves(offers[_offerID].oType, false, x);
     }
 
     function getTicketAddress (uint _ticketID) public constant returns (address ticketAddress) {

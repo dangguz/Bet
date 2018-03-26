@@ -17,7 +17,7 @@ contract("Market", function(accounts){
   var m_maxPrice = 100;
   var m_pricesLength = 101;
 
-  const testSize = 5;
+  const testSize = 10;
   var fs = require("fs");
 
   // Catch an instance of Token contract
@@ -89,20 +89,24 @@ contract("Market", function(accounts){
     i ++;
   } while(i < testSize);
 
-  var output = "PrevOffers,Price,Type,Quantity,PriceChange,TicketCreation,Gas\n";
+  var output = "PrevOffers,Price,Type,Quantity,Cancelled,PriceChange,TicketCreation,DummyOffers,ApproveGas,LaunchOfferGas,TotalGas\n";
   function sendOffer(_index){
     it("Send a new offer", function(){
       var matching = false;
-      // Define variables to use
-      var priceChange = false;
-      var gas;
+      var priceChange = 0;
+      var dummyOffers = 0;
+      var aGas;
+      var lGas;
+      var tGas;
       var outputInfo;
       var agent;
       var price;
       var quantity;
       var type;
       var cancel;
-      var offerID;
+      var ticketID = -1;
+      var offerID = -1;
+      var ticketsCreated = 0;
       var count = 0;
       var unitaryOfferInfo = "";
       var typeString = "Buying";
@@ -132,24 +136,17 @@ contract("Market", function(accounts){
           // Agent must have some tokens in its account
           return c_Token.transfer(agent, 1000, {"from": m_tokenCreator}).then(function(){
             // Agent must approve the contract to spend its funds
-            return c_Token.approve(c_Market.address, price * quantity, {"from": agent}).then(function(){
+            return c_Token.approve(c_Market.address, price * quantity, {"from": agent}).then(function(result){
+              aGas = result.receipt.gasUsed;
               // Launch the offer
               return c_Market.launchOffer(price, quantity, type, 0, {"from": agent}).then(function(result){
-                gas = result.receipt.gasUsed;
+                lGas = result.receipt.gasUsed;
                 // Catch the events
                 e_NewOffer.watch(function(err,eventResponse){
                   if(eventResponse.args._type){typeString = "Selling";}
-                  offerInfo = "\n    =>Event: New Offer" +
-                              "\n             Price: " + price +
-                              "\n             Price ID: " + price/m_priceScale +
-                              "\n             Type: " + typeString +
-                              "\n             Quantity: " + quantity/m_tickVolume +
-                              "\n             Agent: " + agent +
-                              "\n             Gas: " + gas +
-                              "\n";
-                  if(offerID != eventResponse.args._offerID.toNumber()){
-                    count ++;
+                  if(offerID < eventResponse.args._offerID.toNumber()){
                     offerID = eventResponse.args._offerID.toNumber();
+                    count ++;
                     unitaryOfferInfo += "\n      Unitary Offer" +
                                         "\n      -------------" +
                                         "\n      Price ID: " + eventResponse.args._priceID.toNumber() +
@@ -157,10 +154,17 @@ contract("Market", function(accounts){
                                         "\n      Type: " + typeString +
                                         "\n      Quantity: " + "1" +
                                         "\n";
+                    // Get output variables
+                    if(price != eventResponse.args._price.toNumber()){priceChange ++;}
                   }
-                  // Get output variables
-                  if (price != eventResponse.args._price.toNumber()){priceChange = true;}
-                  outputInfo = (_index) + "," + eventResponse.args._price.toNumber() + "," + typeString + "," + quantity/m_tickVolume + "," + priceChange;
+                  offerInfo = "\n    =>Event: New Offer" +
+                              "\n             Price: " + price +
+                              "\n             Price ID: " + price/m_priceScale +
+                              "\n             Type: " + typeString +
+                              "\n             Quantity: " + quantity/m_tickVolume +
+                              "\n             Agent: " + agent +
+                              "\n             Gas: " + lGas +
+                              "\n";
                 });
                 // Tickets will not always be created
                 e_TicketCreation.watch(function(err,eventResponse){
@@ -170,6 +174,10 @@ contract("Market", function(accounts){
                       ticketAddressA = eventResponse.args._ticketAddress;
                     }else{
                       ticketAddressB = eventResponse.args._ticketAddress;
+                    }
+                    if(ticketID < eventResponse.args._ticketID.toNumber()){
+                      ticketID = eventResponse.args._ticketID.toNumber();
+                      ticketsCreated ++;
                     }
                   }
                 });
@@ -200,9 +208,12 @@ contract("Market", function(accounts){
                         }else{
                           console.log("      Unitary Offer created\n" + unitaryOfferInfo);
                         }
+                        if(count != quantity/m_tickVolume){dummyOffers = count - quantity/m_tickVolume;}
                         // console.log(priceInfo);
                         // Add the output information
-                        output += outputInfo + "," + matching + "," + gas + "\n";
+                        tGas = aGas + lGas;
+                        outputInfo = (_index) + "," + price + "," + typeString + "," + quantity/m_tickVolume + "," + cancel + "," + priceChange;
+                        output += outputInfo + "," + ticketsCreated/2 + "," + dummyOffers + "," + aGas + "," + lGas + "," + tGas + "\n";
                         // Write the output file when test is finished
                         if (_index == testSize - 1){
                           fs.writeFile("./test/output.csv", output, function (err) {
@@ -213,7 +224,7 @@ contract("Market", function(accounts){
                         }
                         if(cancel != 0){
                           // Cancel the offer
-                          return c_Market.cancelOffer(price/m_priceScale, offerID, type, {"from": agent}).then(function(){
+                          return c_Market.cancelOffer(offerID, {"from": agent}).then(function(){
                             cancelled = "\n      Cancelled Offer" +
                                         "\n      ---------------" +
                                         "\n      Price ID: " + price/m_priceScale +
