@@ -19,7 +19,7 @@ contract("Market", function(accounts){
   var sellActive = true;
   var ticketPriceB = 51;
   var tsell = 2; // Must be lower than negotiationPeriod
-  var seller = false;
+  var seller = true;
 
   var seq_type = new Array(0, 1, 0);
   if(sellActive && seller){seq_type[2]=1;}
@@ -211,46 +211,51 @@ contract("Market", function(accounts){
     var user;
     var data;
     var typestring = "Buying";
+    var sellAtThisPrice = 0;
     it("Sell the ticket", function(){
-      return c_Market.getTicketAddress(_id, {"from": m_marketCreator}).then(function(res){
-        c_Ticket = Ticket.at(res);
+      return c_Market.maxPrice().then(function(res){
+        if(seller){sellAtThisPrice=res.toNumber();}
       }).then(function(){
-        return c_Ticket.user().then(function(res){
-          user = res;
+        return c_Market.getTicketAddress(_id, {"from": m_marketCreator}).then(function(res){
+          c_Ticket = Ticket.at(res);
         }).then(function(){
-          return c_Ticket.sellTicket({"from": user}).then(function(){
-            // Catch the events
-            // When sellTicket() is called, the sequence of events is newOffer->Transfer->ticketUserChange
-            e_NewOffer.watch(function(err,eventResponse){
-              if(!err){
-                if (eventResponse.args._type){typestring = "Selling";}
-                data = "\n    =>Event: New Offer" +
-                       "\n             Price: " + eventResponse.args._price.toNumber() +
-                       "\n             Type: " + typestring +
-                       "\n";
-              }
-            });
-            e_Transfer.watch(function(err,eventResponse){
-              if(!err){
-                data2 = "\n    =>Event: Transfer" +
-                        "\n             from: " + eventResponse.args._from +
-                        "\n             to: " + eventResponse.args._to +
-                        "\n             value: " + eventResponse.args._value.toNumber() +
-                        "\n";
-              }
-            });
-            e_ticketUserChange.watch(function(err,eventResponse){
-              if(!err){
-                data3 = "\n    =>Event: Ticket User Change" +
-                        "\n             ID: " + eventResponse.args._ticketID.toNumber() +
-                        "\n";
-              }
-            });
+          return c_Ticket.user().then(function(res){
+            user = res;
           }).then(function(){
-            return c_Token.balanceOf(user).then(function(res){
-              console.log(data);
-              console.log(data2);
-              console.log(data3);
+            return c_Ticket.sellTicket(sellAtThisPrice, {"from": user}).then(function(){
+              // Catch the events
+              // When sellTicket() is called, the sequence of events is newOffer->Transfer->ticketUserChange
+              e_NewOffer.watch(function(err,eventResponse){
+                if(!err){
+                  if (eventResponse.args._type){typestring = "Selling";}
+                  data = "\n    =>Event: New Offer" +
+                         "\n             Price: " + eventResponse.args._price.toNumber() +
+                         "\n             Type: " + typestring +
+                         "\n";
+                }
+              });
+              e_Transfer.watch(function(err,eventResponse){
+                if(!err){
+                  data2 = "\n    =>Event: Transfer" +
+                          "\n             from: " + eventResponse.args._from +
+                          "\n             to: " + eventResponse.args._to +
+                          "\n             value: " + eventResponse.args._value.toNumber() +
+                          "\n";
+                }
+              });
+              e_ticketUserChange.watch(function(err,eventResponse){
+                if(!err){
+                  data3 = "\n    =>Event: Ticket User Change" +
+                          "\n             ID: " + eventResponse.args._ticketID.toNumber() +
+                          "\n";
+                }
+              });
+            }).then(function(){
+              return c_Token.balanceOf(user).then(function(res){
+                console.log(data);
+                console.log(data2);
+                console.log(data3);
+              });
             });
           });
         });
@@ -310,7 +315,7 @@ contract("Market", function(accounts){
   }
 
   function printBalance(_account){
-    it("", function(){
+    it("Print final balance", function(){
       return c_Token.balanceOf(_account).then(function(res){
         console.log("\n    " + _account + " -> " + res.toNumber() + "\n");
       });
