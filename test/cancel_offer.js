@@ -17,7 +17,7 @@ contract("Market", function(accounts){
   var m_maxPrice = 100;
   var m_pricesLength = 101;
 
-  const testSize = 10;
+  const testSize = 5;
   var fs = require("fs");
 
   // Catch an instance of Token contract
@@ -139,7 +139,7 @@ contract("Market", function(accounts){
             return c_Token.approve(c_Market.address, price * quantity, {"from": agent}).then(function(result){
               aGas = result.receipt.gasUsed;
               // Launch the offer
-              return c_Market.launchOffer(price, quantity, type, 0, {"from": agent}).then(function(result){
+              return c_Market.launchOffer(price, quantity, type, {"from": agent}).then(function(result){
                 lGas = result.receipt.gasUsed;
                 // Catch the events
                 e_NewOffer.watch(function(err,eventResponse){

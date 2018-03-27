@@ -24,4 +24,10 @@ contract MyToken is StandardToken {
         symbol = _tokenSymbol;                               // Set the symbol for display purposes
     }
 
+    function transferAllowance (address _from, address _to, uint _value) public {
+        require(allowed[_from][msg.sender] >= _value);
+        allowed[_from][msg.sender] -= _value;
+        allowed[_from][_to] += _value;
+    }
+
 }

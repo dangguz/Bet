@@ -139,7 +139,7 @@ contract("Market", function(accounts){
             // Agent must approve the contract to spend its funds
             return c_Token.approve(c_Market.address, price * quantity, {"from": agent}).then(function(){
               // Launch the offer
-              return c_Market.launchOffer(price, quantity, type, 0, {"from": agent}).then(function(result){
+              return c_Market.launchOffer(price, quantity, type, {"from": agent}).then(function(result){
                 gas = result.receipt.gasUsed;
                 // Catch the events
                 e_NewOffer.watch(function(err,eventResponse){

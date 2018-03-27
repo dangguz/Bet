@@ -75,7 +75,7 @@ contract("Market", function(accounts){
         // Agent must approve the contract to spend its funds
         return c_Token.approve(c_Market.address, price * quantity, {"from": agent}).then(function(){
           // Launch the offer
-          return c_Market.launchOffer(price, quantity, type, 0, {"from": agent}).then(function(){
+          return c_Market.launchOffer(price, quantity, type, {"from": agent}).then(function(){
             // Catch the event
             e_TicketCreation.watch(function(err,eventResponse){
               if(!err){

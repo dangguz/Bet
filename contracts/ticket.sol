@@ -12,7 +12,7 @@ contract Ticket is OneUserOneOwner {
     Market mkt;
     uint public ID;
     uint public ticketPrice;
-    uint ticketBalance;             // Balance for updating profit and loss
+    int ticketBalance;              // Balance for updating profit and loss
     uint priceReference;            // Reference to compare with when updating the balance
     uint threshold;                 // Threshold between negotiation and delivery periods
     uint finishDate;                // Last day of the delivery period
@@ -37,7 +37,7 @@ contract Ticket is OneUserOneOwner {
                                     // the address of the market contains the information of the product
         address _tokenAddress,      // Address of the Token we are trading with
         address _agentAddress,      // Address of the owner of the ticket
-        uint _price,                // Trading price (tokens per MWh)
+        uint _price,                // Trading price (tokens per energy unit)
         bool _type                  // Type of the ticket: 0 = buying; 1 = selling
         ) public {
         require (msg.sender == _marketAddress);  // Only the associated market contract can print tickets
@@ -49,7 +49,7 @@ contract Ticket is OneUserOneOwner {
         finishDate = threshold + mkt.contractMaturity();
         ticketPrice = _price;
         priceReference = ticketPrice;
-        ticketBalance = _price / 5;   // Initialize the ticket balance
+        ticketBalance = int(_price) / 5;   // Initialize the ticket balance
         ticketType = _type;
     }
 
@@ -61,30 +61,38 @@ contract Ticket is OneUserOneOwner {
         if (period) { priceReference = ticketPrice; }
         // Update the ticket balance if necessary
         if (priceReference != _energyPrice)
-        ticketBalance += sell * (priceReference - _energyPrice) + buy * (_energyPrice - priceReference);
+        ticketBalance += int(sell * (priceReference - _energyPrice) + buy * (_energyPrice - priceReference));
+        if (ticketBalance < 0) { // If ticket balance is below 0, it triggers the margin call and resets the value of the balance
+          token.transferFrom(user, this, uint(-ticketBalance) + ticketPrice / 5);
+          ticketBalance = int(ticketPrice) / 5;
+        }
         if (!period) { priceReference = _energyPrice; }
         if ((now / 1 days) == finishDate) { closeTicket(); }
     }
 
     function closeTicket () internal {
         token.transfer(mkt, token.balanceOf(this));
-        token.transferFrom(mkt, user, ticketBalance * mkt.tickVolume());
+        if (ticketBalance < 0) {
+            token.transferFrom(user, mkt, uint(-ticketBalance) * mkt.tickVolume());
+        } else {
+            token.transferFrom(mkt, user, uint(ticketBalance) * mkt.tickVolume());
+        }
         TicketDestruction(ID);
-        selfdestruct(mkt);    // Destroy this contract
+        /* selfdestruct(mkt);    // Destroy this contract */
     }
 
     function sellTicket (uint _atThisPrice) public onlyUser {
         require (!period); // Ticket can only be sold in the negotiation period
         // Place an offer with type = !ticketType at the desire price
         if (ticketType) {
-            mkt.launchOffer(_atThisPrice, mkt.tickVolume(), !ticketType, ID);
+            mkt.launchOffer(_atThisPrice, mkt.tickVolume(), !ticketType);
         } else {
-            mkt.launchOffer(_atThisPrice, mkt.tickVolume(), !ticketType, ID);
+            mkt.launchOffer(_atThisPrice, mkt.tickVolume(), !ticketType);
         }
     }
 
-    function getBalance () public onlyUser constant returns (uint balance) {
-        balance = ticketBalance * mkt.tickVolume();
+    function getBalance () public onlyUser constant returns (int balance) {
+        balance = ticketBalance * int(mkt.tickVolume());
         return balance;
     }
 

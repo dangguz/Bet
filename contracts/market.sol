@@ -70,7 +70,7 @@ contract Market {
     }
 
     // Functions
-    function launchOffer (uint _price, uint _quantity, bool _type, uint _ID) public {
+    function launchOffer (uint _price, uint _quantity, bool _type) public {
         // Check offer parameters are valid
         require (_quantity % tickVolume == 0);
         require (_price % priceScale == 0 && _price <= maxPrice);
@@ -185,7 +185,8 @@ contract Market {
         ticketCreation(newTicket, ticketID);  // Launch the event
         margin = _price / 5;
         token.transferFrom(_agent, newTicket, margin * tickVolume);
-        token.approve(newTicket, 100);
+        token.transferAllowance(_agent, newTicket, token.allowance(_agent, this));
+        token.approve(newTicket, 5 * margin * tickVolume);
         ticketID ++;
     }
 
