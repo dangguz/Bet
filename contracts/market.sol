@@ -75,7 +75,7 @@ contract Market {
         require (_quantity % tickVolume == 0);
         require (_price % priceScale == 0 && _price <= maxPrice);
         // Check the sender has allowed this contract to spend its funds, unless the sender is a ticket
-        require (token.allowance(msg.sender, this) >= (_price * _quantity) || isTicket[msg.sender]);
+        require (token.allowance(msg.sender, this) >= ((_price + 10) * _quantity) || isTicket[msg.sender]);
 
         // All the offers are processed as unitary ones (quantity = tickVolume)
         // It performs a loop which will send k unitary offers
@@ -185,7 +185,7 @@ contract Market {
         ticketCreation(newTicket, ticketID);  // Launch the event
         margin = _price / 5;
         token.transferFrom(_agent, newTicket, margin * tickVolume);
-        token.transferAllowance(_agent, newTicket, token.allowance(_agent, this));
+        token.transferAllowance(_agent, newTicket, 4 * margin * tickVolume);
         token.approve(newTicket, 5 * margin * tickVolume);
         ticketID ++;
     }

@@ -17,7 +17,7 @@ contract("Market", function(accounts){
   var m_maxPrice = 100;
   var m_pricesLength = 101;
 
-  const testSize = 5;
+  const testSize = 30;
   var fs = require("fs");
 
   // Catch an instance of Token contract
@@ -89,7 +89,7 @@ contract("Market", function(accounts){
     i ++;
   } while(i < testSize);
 
-  var output = "PrevOffers,Price,Type,Quantity,Cancelled,PriceChange,TicketCreation,DummyOffers,ApproveGas,LaunchOfferGas,TotalGas\n";
+  var output = "PrevOffers,Price,Type,Quantity,Cancelled,PriceChange,TicketCreation,DummyOffers,ApproveGas,LaunchOfferGas,CancelGas,TotalGas\n";
   function sendOffer(_index){
     it("Send a new offer", function(){
       var matching = false;
@@ -97,6 +97,7 @@ contract("Market", function(accounts){
       var dummyOffers = 0;
       var aGas;
       var lGas;
+      var cGas = 0;
       var tGas;
       var outputInfo;
       var agent;
@@ -136,7 +137,7 @@ contract("Market", function(accounts){
           // Agent must have some tokens in its account
           return c_Token.transfer(agent, 1000, {"from": m_tokenCreator}).then(function(){
             // Agent must approve the contract to spend its funds
-            return c_Token.approve(c_Market.address, price * quantity, {"from": agent}).then(function(result){
+            return c_Token.approve(c_Market.address, (price + 10) * quantity, {"from": agent}).then(function(result){
               aGas = result.receipt.gasUsed;
               // Launch the offer
               return c_Market.launchOffer(price, quantity, type, {"from": agent}).then(function(result){
@@ -203,28 +204,17 @@ contract("Market", function(accounts){
                                     "\n      Selling Accrued: " + sellingAccrued_after +
                                     "\n";
                         console.log(offerInfo);
-                        if(quantity/m_tickVolume != 1){
+                        if(count != 1){
                           console.log("      " + count + " Unitary Offers have been created\n" + unitaryOfferInfo);
                         }else{
                           console.log("      Unitary Offer created\n" + unitaryOfferInfo);
                         }
                         if(count != quantity/m_tickVolume){dummyOffers = count - quantity/m_tickVolume;}
                         // console.log(priceInfo);
-                        // Add the output information
-                        tGas = aGas + lGas;
-                        outputInfo = (_index) + "," + price + "," + typeString + "," + quantity/m_tickVolume + "," + cancel + "," + priceChange;
-                        output += outputInfo + "," + ticketsCreated/2 + "," + dummyOffers + "," + aGas + "," + lGas + "," + tGas + "\n";
-                        // Write the output file when test is finished
-                        if (_index == testSize - 1){
-                          fs.writeFile("./test/output.csv", output, function (err) {
-                            if (err)
-                            return console.log(err);
-                            console.log("      Wrote test information in file output.csv, just check it\n");
-                          });
-                        }
                         if(cancel != 0){
                           // Cancel the offer
-                          return c_Market.cancelOffer(offerID, {"from": agent}).then(function(){
+                          return c_Market.cancelOffer(offerID, {"from": agent}).then(function(result){
+                            cGas = result.receipt.gasUsed;
                             cancelled = "\n      Cancelled Offer" +
                                         "\n      ---------------" +
                                         "\n      Price ID: " + price/m_priceScale +
@@ -232,6 +222,24 @@ contract("Market", function(accounts){
                                         "\n      Type: " + typeString +
                                         "\n";
                             console.log("\n      Last offer has been cancelled\n" + cancelled + "\n");
+                            // Add the output information
+                            tGas = aGas + lGas + cGas;
+                            outputInfo = (_index) + "," + price + "," + typeString + "," + quantity/m_tickVolume + "," + cancel + "," + priceChange;
+                            output += outputInfo + "," + ticketsCreated/2 + "," + dummyOffers + "," + aGas + "," + lGas + "," + cGas + "," + tGas + "\n";
+                          });
+                        }
+                        // Add the output information
+                        if (cancel == 0){
+                          tGas = aGas + lGas + cGas;
+                          outputInfo = (_index) + "," + price + "," + typeString + "," + quantity/m_tickVolume + "," + cancel + "," + priceChange;
+                          output += outputInfo + "," + ticketsCreated/2 + "," + dummyOffers + "," + aGas + "," + lGas + "," + cGas + "," + tGas + "\n";
+                        }
+                        // Write the output file when test is finished
+                        if (_index == testSize - 1){
+                          fs.writeFile("./test/output.csv", output, function (err) {
+                            if (err)
+                            return console.log(err);
+                            console.log("      Wrote test information in file output.csv, just check it\n");
                           });
                         }
                         // Print Tickets information if two offers have matched

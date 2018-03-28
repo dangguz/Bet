@@ -63,7 +63,7 @@ contract Ticket is OneUserOneOwner {
         if (priceReference != _energyPrice)
         ticketBalance += int(sell * (priceReference - _energyPrice) + buy * (_energyPrice - priceReference));
         if (ticketBalance < 0) { // If ticket balance is below 0, it triggers the margin call and resets the value of the balance
-          token.transferFrom(user, this, uint(-ticketBalance) + ticketPrice / 5);
+          token.transferFrom(user, this, mkt.tickVolume() * (uint(-ticketBalance) + ticketPrice / 5));
           ticketBalance = int(ticketPrice) / 5;
         }
         if (!period) { priceReference = _energyPrice; }

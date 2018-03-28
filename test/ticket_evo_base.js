@@ -10,7 +10,7 @@ contract("Market", function(accounts){
   // Public member variables
   var m_tokenCreator = accounts[5];
   var m_marketCreator = accounts[4];
-  var m_tickVolume = 1;
+  var m_tickVolume = 3;
   var m_priceScale = 1;
   var changed = new Array (false, false);
   var totalOracleGas = new Array (0, 0);
@@ -79,7 +79,7 @@ contract("Market", function(accounts){
           // Agent must have some tokens in its account
           return c_Token.transfer(agent, 1000, {"from": m_tokenCreator}).then(function(){
             // Agent must approve the contract to spend its funds
-            return c_Token.approve(c_Market.address, price * quantity, {"from": agent}).then(function(){
+            return c_Token.approve(c_Market.address, (price + 10) * quantity, {"from": agent}).then(function(){
               // Launch the offer
               return c_Market.launchOffer(price, quantity, type, {"from": agent}).then(function(){
                 // Catch the event
@@ -99,8 +99,8 @@ contract("Market", function(accounts){
                 }).then(function(){
                   return c_Market.getNumOffers(price/m_priceScale, 1).then(function(res){
                     sellingOffers_num_after = res.toNumber();
-                    assert.equal(buyingOffers_num_after, buyingOffers_num_before + (1 - type)*quantity);
-                    assert.equal(sellingOffers_num_after, sellingOffers_num_before + type*quantity);
+                    assert.equal(buyingOffers_num_after, buyingOffers_num_before + (1 - type) * quantity / m_tickVolume);
+                    assert.equal(sellingOffers_num_after, sellingOffers_num_before + type * quantity / m_tickVolume);
                     // Print Tickets information if two offers have matched
                     if(matching){
                       c_Ticket = Ticket.at(ticketAddressA);
