@@ -17,7 +17,7 @@ contract("Market", function(accounts){
   var m_maxPrice = 100;
   var m_pricesLength = 101;
 
-  const testSize = 30;
+  const testSize = 25;
   var fs = require("fs");
 
   // Catch an instance of Token contract
@@ -236,10 +236,10 @@ contract("Market", function(accounts){
                         }
                         // Write the output file when test is finished
                         if (_index == testSize - 1){
-                          fs.writeFile("./test/output.csv", output, function (err) {
+                          fs.writeFile("./test/output_01.csv", output, function (err) {
                             if (err)
                             return console.log(err);
-                            console.log("      Wrote test information in file output.csv, just check it\n");
+                            console.log("      Wrote test information in file output_01.csv, just check it\n");
                           });
                         }
                         // Print Tickets information if two offers have matched

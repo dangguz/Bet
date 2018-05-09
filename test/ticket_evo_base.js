@@ -274,10 +274,10 @@ contract("Market", function(accounts){
                       e_TicketDestruction.stopWatching();
                       if(ttype){
                         output += signal + "," + period + ","+ balances[0] + "," + balances[1] + "," + totalOracleGas[0] + "," + totalOracleGas[1] + "," + (totalOracleGas[0] + totalOracleGas[1]) + "\n";
-                        fs.writeFile("./test/output.csv", output, function (err) {
+                        fs.writeFile("./test/output_02.csv", output, function (err) {
                           if (err)
                           return console.log(err);
-                          console.log("\n      Wrote test information in file output.csv, just check it\n");
+                          console.log("\n      Wrote test information in file output_02.csv, just check it\n");
                         });
                       }
                     });
